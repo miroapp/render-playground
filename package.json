@@ -19,6 +19,6 @@
   },
   "homepage": "https://github.com/miroapp/render-playground#readme",
   "devDependencies": {
-    "parcel": "latest"
+    "parcel": "^2.0.0"
   }
 }
