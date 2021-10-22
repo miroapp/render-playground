@@ -1,0 +1,24 @@
+{
+  "name": "render-playground",
+  "version": "1.0.0",
+  "description": "WebGL-related experiments",
+  "source": "src/index.html",
+  "scripts": {
+    "start": "parcel",
+    "build": "parcel build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/miroapp/render-playground.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/miroapp/render-playground/issues"
+  },
+  "homepage": "https://github.com/miroapp/render-playground#readme",
+  "devDependencies": {
+    "parcel": "latest"
+  }
+}
