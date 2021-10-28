@@ -21,6 +21,118 @@
       0 FPS
     </div>
     <canvas id="scene"></canvas>
+    <div id="monster.vert" style="display: none">
+      uniform vec4 view;
+
+      attribute vec4 slot1;
+      attribute vec4 slot2;
+      // special one
+      attribute float texId;
+
+      varying vec4 fragColor;
+      varying vec3 fragTUV;
+
+      // world space position
+      vec2 position;
+
+      void main()
+      {
+        float type = slot1.x;
+
+        // debug triangle
+        if (type < 1.5) {
+          position = slot1.yz;
+          fragColor = slot2;
+          fragTUV = vec3(0.0);
+        // image
+        } else if (type < 2.5) {
+          position = slot1.yz;
+          fragTUV = vec3(texId, slot2.y, slot2.z);
+        // render_to_texture
+        } else if (type < 3.5) {
+          fragTUV = vec3(1.0, slot1.yz);
+          gl_Position = vec4(slot1.yz * view.zw + view.xy, 0.5, 1);
+          return;
+        }
+
+        // apply camera to world space position
+        gl_Position = vec4((position + view.xy) * view.zw, 0.5, 1);
+      }
+    </div>
+    <div id="monster.frag" style="display: none;">
+      precision mediump float;
+      precision lowp sampler2D;
+
+      uniform sampler2D textures[16];
+      uniform float debugSkew;
+
+      varying vec4 fragColor;
+      varying vec3 fragTUV;
+        
+      void main()
+      {
+        vec4 color;
+
+        float fragTexId = fragTUV.x;
+        vec2 fragUV = fragTUV.yz;
+
+        if (fragTexId < 0.5) {
+          color = fragColor;
+        }
+        else if (fragTexId < 1.5) {
+          color = texture2D(textures[0], fragUV);
+        }
+        else if (fragTexId < 2.5) {
+          color = texture2D(textures[1], fragUV);
+        }
+        else if (fragTexId < 3.5) {
+          color = texture2D(textures[2], fragUV);
+        }
+        else if (fragTexId < 4.5) {
+          color = texture2D(textures[3], fragUV);
+        }
+        else if (fragTexId < 5.5) {
+          color = texture2D(textures[4], fragUV);
+        }
+        else if (fragTexId < 6.5) {
+          color = texture2D(textures[5], fragUV);
+        }
+        else if (fragTexId < 7.5) {
+          color = texture2D(textures[6], fragUV);
+        }
+        else if (fragTexId < 8.5) {
+          color = texture2D(textures[7], fragUV);
+        }
+        else if (fragTexId < 9.5) {
+          color = texture2D(textures[8], fragUV);
+        }
+        else if (fragTexId < 10.5) {
+          color = texture2D(textures[9], fragUV);
+        }
+        else if (fragTexId < 12.5) {
+          color = texture2D(textures[10], fragUV);
+        }
+        else if (fragTexId < 12.5) {
+          color = texture2D(textures[11], fragUV);
+        }
+        else if (fragTexId < 13.5) {
+          color = texture2D(textures[12], fragUV);
+        }
+        else if (fragTexId < 14.5) {
+          color = texture2D(textures[13], fragUV);
+        }
+        else if (fragTexId < 15.5) {
+          color = texture2D(textures[14], fragUV);
+        }
+        else {
+          color = texture2D(textures[15], fragUV);
+        }
+
+        gl_FragColor = color;
+      }
+    </div>
+    <script src="earcut.min.js"></script>
+    <script src="shelf-pack.min.js"></script>
     <script src="index.ts"></script>
   </body>
 </html>

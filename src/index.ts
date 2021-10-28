@@ -1,223 +1,89 @@
-const shaders = {
-    // <!-- this shader is used to implement simple batching -->
-    "shader.vert": `
-          attribute vec2 vertexPosition;
-          attribute vec4 vertexColor;
-          varying vec4 color;
-          void main()
-          {
-            color = vertexColor;
-            gl_Position = vec4(vertexPosition, 0, 1);
-          }`,
+const MAX_VERTICES = 200000; // this is the maximum amount of vertices we can address without switching vertex buffer
+const MAX_TRIANGLES = MAX_VERTICES; // lets just say one triangle have at least 1 unique vertex (quite a stretch actually)
+const MAX_INDICES = MAX_TRIANGLES * 3; // but each triangle will still have 3 indices
 
-    "shader.frag": `
-          precision mediump float;
-          varying vec4 color;
-          void main()
-          {
-            gl_FragColor = color;
-          }`,
-    // <!-- this shader is basically a copy of a batch shader just to test shader switches -->
-    "batch2.vert": `
-          attribute vec2 vertexPosition;
-          attribute vec4 vertexColor;
-          varying vec4 color;
-          void main()
-          {
-              color = vertexColor;
-              gl_Position = vec4(vertexPosition, 1, 1);
-          }`,
-    "batch2.frag": `
-          precision mediump float;
-          varying vec4 color;
-          void main()
-          {
-              gl_FragColor = color;
-          }`,
-    //<!-- this shader is to implement instancing -->
-    "instancing.vert": `
-          attribute vec2 vertexPosition;
-          // per quad
-          attribute vec2 vertexOffset;
-          attribute vec2 vertexScale;
-          attribute vec4 vertexColor;
-          varying vec4 color;
-          void main()
-          {
-              color = vertexColor;
-              gl_Position = vec4(vertexPosition * vertexScale + vertexOffset, 0, 1);
-          }`,
-    "instancing.frag": `
-          precision mediump float;
-          varying vec4 color;
-          void main()
-          {
-              gl_FragColor = color;
-          }`,
-    //<!-- this shader is to test effect of branching -->
-    "branching.vert": `
-          attribute vec2 vertexPosition;
-          attribute vec4 vertexColor;
-          varying vec4 color;
-          void main()
-          {
-              color = vertexColor;
-              float z = 0.0;
-              // 0.2 .. 0.7
-              if (vertexColor.a > 0.49) {
-                  z = 3.9;
-              } else if (vertexColor.a > 0.50) {
-                  z = 4.0;
-              } else if (vertexColor.a > 0.51) {
-                  z = 4.1;
-              } else if (vertexColor.a > 0.52) {
-                  z = 4.2;
-              } else if (vertexColor.a > 0.53) {
-                  z = 4.3;
-              } else if (vertexColor.a > 0.54) {
-                  z = 4.4;
-              } else if (vertexColor.a > 0.55) {
-                  z = 4.5;
-              } else if (vertexColor.a > 0.56) {
-                  z = 4.6;
-              } else if (vertexColor.a > 0.57) {
-                  z = 4.7;
-              } else {
-                  z = 0.0;
-              }
-              gl_Position = vec4(vertexPosition, z, 1);
-          }`,
-    "branching.frag": `
-          precision mediump float;
-          varying vec4 color;
-          void main()
-          {
-              float a = 0.0;
-              if (color.a > 0.3) {
-                  a = 0.3;
-              } else if (color.a > 0.31) {
-                  a = 0.31;
-              } else if (color.a > 0.32) {
-                  a = 0.32;
-              } else if (color.a > 0.33) {
-                  a = 0.33;
-              } else if (color.a > 0.34) {
-                  a = 0.34;
-              } else if (color.a > 0.35) {
-                  a = 0.35;
-              } else if (color.a > 0.36) {
-                  a = 0.36;
-              } else if (color.a > 0.37) {
-                  a = 0.37;
-              } else if (color.a > 0.38) {
-                  a = 0.38;
-              } else if (color.a > 0.39) {
-                  a = 0.39;
-              } else if (color.a > 0.40) {
-                  a = 0.40;
-              } else if (color.a > 0.41) {
-                  a = 0.41;
-              } else if (color.a > 0.42) {
-                  a = 0.42;
-              } else if (color.a > 0.43) {
-                  a = 0.43;
-              } else if (color.a > 0.44) {
-                  a = 0.44;
-              } else if (color.a > 0.45) {
-                  a = 0.45;
-              } else if (color.a > 0.46) {
-                  a = 0.46;
-              } else if (color.a > 0.47) {
-                  a = 0.47;
-              } else if (color.a > 0.48) {
-                  a = 0.48;
-              } else if (color.a > 0.49) {
-                  a = 0.49;
-              } else if (color.a > 0.50) {
-                  a = 0.50;
-              } else if (color.a > 0.51) {
-                  a = 0.51;
-              } else if (color.a > 0.52) {
-                  a = 0.52;
-              } else if (color.a > 0.53) {
-                  a = 0.53;
-              } else if (color.a > 0.54) {
-                  a = 0.54;
-              } else if (color.a > 0.55) {
-                  a = 0.55;
-              } else if (color.a > 0.56) {
-                  a = 0.56;
-              } else if (color.a > 0.57) {
-                  a = 0.57;
-              } else {
-                  a = 0.1;
-              }
-              gl_FragColor = vec4(color.rgb, a);
-          }`,
-};
-const STATE = {
-    // amount of quads to allocate buffers for
-    MAX_QUADS: 2000000,
+type ImageSource = HTMLImageElement | HTMLCanvasElement
 
-    // amount of quads to be added to buffers and rendered
-    QUAD_COUNT: 2000000,
+enum PrimitiveType {
+    DEBUG_TRIANGLE = 1,
+    IMAGE = 2,
+    RENDER_TO_TEXTURE = 3
+}
 
-    // this is amount of degenerate quads (triangles) to add to the start and to the end of buffer
-    DEGEN_START_COUNT: 0,
-    DEGEN_END_COUNT: 0,
+const MONSTER_SHADER_ATTRIBUTES = 
+[
+    {
+        name: 'slot1',
+        size: 4,
+    },
+    {
+        name: 'slot2',
+        size: 4
+    }
+]
 
-    // testing how update buffer in GPU every frame affects performance
-    UPDATE_BATCH_EVERY_FRAME: false,
-    // this is to test how amount of actual draw calls affects performance
-    // works only for batching
-    // also this need to be enabled to test shader switches
-    // as they occur every drawCall if SWITCH_SHADERS_FOR_EACH_DRAW_CALL is enabled
-    SEPARATE_DRAW_CALLS: false,
-    // if SEPARATE_DRAW_CALLS if set to true, this option specifies
-    // how many quads should be rendered per drawCall
-    HOW_MANY_QUADS_PER_CALL: 20,
-    // this is to test how switching shader for every drawCall affects performance
-    // this flag only works if SEPARATE_DRAW_CALLS is set to true
-    // shader switch occur once per drawCall which is affected by HOW_MANY_QUADS_PER_CALL option
-    SWITCH_SHADERS_FOR_EACH_DRAW_CALL: false,
-    // this is to test how instancing affects performance
-    // SEPARATE_DRAW_CALLS and SWITCH_SHADERS_FOR_EACH_DRAW_CALL do not work with instancing enabled
-    USE_INSTANCING: false,
-    // this is mainly to test how amount of pixels filled by GPU affect performance
-    // since quads are transparent, random placed quads are overlapping
-    // this results in a scene with huge amount of Fillrate (https://en.wikipedia.org/wiki/Fillrate)
-    // NOTE: random is deterministic and page refresh should produce same scene
-    USE_RANDOM_PLACING: false,
-    // this is to test how branches in shader affect performance
-    USE_SHADER_BRANCHING: true,
-    // this is to test effect of triangle strips instead of triangles
-    // works only with USE_INSTANCING set to true
-    // TODO make this work with batching
-    USE_TRIANGLE_STRIP: true,
-};
+// stride for vertex buffer, this is the maximum highest amount used by any shader included in monster shader
 
-// this is constants needed to actually bind attributes to their respective buffers
-let ramBuffer: Float32Array
-// batching
-const VERTEX_STRIDE = 2 + 4; // amount of floats per vertex
-const QUAD_STRIDE = 6 * VERTEX_STRIDE; // one quad have 6 vertices, since we use gl.TRIANGLES
-const QUAD_STRIDE_IN_BYTES = QUAD_STRIDE * Float32Array.BYTES_PER_ELEMENT; // amount of bytes per quad
-
-// instancing
-const INSTANCE_STRIDE = 2 + 2 + 4; // amount of floats per instance
-const INSTANCE_STRIDE_IN_BYTES =
-    INSTANCE_STRIDE * Float32Array.BYTES_PER_ELEMENT; // amount of bytes per instance
+const STRIDE_IN_FLOATS = MONSTER_SHADER_ATTRIBUTES.reduce((acum, entry) => acum + entry.size, 0);
+const STRIDE_IN_BYTES = STRIDE_IN_FLOATS * Float32Array.BYTES_PER_ELEMENT;
 
 // here we just setting up canvas get a webgl context and some extentions
 let canvas: HTMLCanvasElement;
-let gl, gl_inst;
+let gl: WebGLRenderingContext;
 
-let mainShader, shaderForSwitch;
+let monsterShader;
+let dummyTexture
 
-let buffer; // buffer with vertices (or instances for instancing)
-let quadsCount = 0; // amount of quad currenly added to the buffer
+let cameraX = 0, cameraY = 0
+let scale = 1
+const view = new Float32Array(4) // x, y, sx, sy
 
-let instancedQuadBuffer; // this one is only needed to instanciate quads as geometry
+let ATLAS_SIZE
+
+type Atlas = {
+    texture: WebGLTexture
+    frameBuffer: WebGLFramebuffer
+    shelf: any
+    renderInCount: number
+}
+
+type Bin = {
+    x: number
+    y: number
+    width: number
+    height: number
+}
+
+type SpaceInAtlas = {
+    atlas: Atlas
+    space: Bin
+}
+
+type DrawCall = {
+    indexCount: number
+    textures: WebGLTexture[]
+}
+
+type DrawCallBuffer = {
+    vertexBuffer: WebGLBuffer
+    texIdBuffer: WebGLBuffer
+    indexBuffer: WebGLBuffer
+
+    vertexBufferRAM: Float32Array
+    texIdBufferRAM: Float32Array
+    indexBufferRAM: Uint32Array
+
+    atlases: Atlas[]
+    
+    nextVertexIndex: number
+    nextIndexIndex: number
+
+    drawCalls: DrawCall[]
+}
+
+const buffers = [] as DrawCallBuffer[] // vertex buffer + index buffer goes here
+
+let atlasQuad: WebGLBuffer
 
 // fps output
 let lastFrameTimestamp = 0;
@@ -227,7 +93,7 @@ initRand();
 setupCanvas();
 setupWebGL();
 setupShaders();
-allocBuffer();
+setupAtlasRenderer();
 fillBuffer();
 
 function setupCanvas() {
@@ -245,15 +111,17 @@ function setupCanvas() {
 }
 
 function setupWebGL() {
-    gl = canvas.getContext("webgl", {
-        alpha: false,
+    gl = create3DContextWithWrapperThatThrowsOnGLError(canvas.getContext("webgl", {
+        alpha: true,
         premultipliedAlpha: false,
         stencil: false,
         depth: false,
         antialias: false,
         powerPreference: "low-power",
-    });
-    gl_inst = gl.getExtension("ANGLE_instanced_arrays");
+    }));
+    // https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/WebGL_best_practices#understand_extension_availability
+    gl.getExtension('OES_element_index_uint')
+    ATLAS_SIZE = 4096;
 
     gl.viewport(0.0, 0.0, canvas.width, canvas.height);
 
@@ -264,111 +132,43 @@ function setupWebGL() {
     gl.clearColor(0.3, 0.55, 0.9, 1);
 }
 
-function setupShaders() {
-    if (STATE.USE_SHADER_BRANCHING) {
-        mainShader = compileShader(
-            "branching",
-            [],
-            ["vertexPosition", "vertexColor"]
-        );
-    } else if (STATE.USE_INSTANCING) {
-        mainShader = compileShader(
-            "instancing",
-            [],
-            ["vertexPosition", "vertexOffset", "vertexScale", "vertexColor"]
-        );
-    } else {
-        mainShader = compileShader(
-            "shader",
-            [],
-            ["vertexPosition", "vertexColor"]
-        );
-    }
-    shaderForSwitch = compileShader(
-        "batch2",
-        [],
-        ["vertexPosition", "vertexColor"]
-    );
-
-    mainShader.use();
+function setupAtlasRenderer() {
+    atlasQuad = gl.createBuffer()
+    gl.bindBuffer(gl.ARRAY_BUFFER, atlasQuad)
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+        PrimitiveType.RENDER_TO_TEXTURE, 0, 0, 0, 
+        PrimitiveType.RENDER_TO_TEXTURE, 1, 0, 0,
+        PrimitiveType.RENDER_TO_TEXTURE, 0, 1, 0,
+        PrimitiveType.RENDER_TO_TEXTURE, 1, 1, 0,
+    ]), gl.STATIC_DRAW)
 }
 
-// this function adds quad to the buffer in order to render it
-function addQuad(x, y, width, height, r, g, b, a) {
-    if (quadsCount >= STATE.MAX_QUADS) {
-        throw new Error("overflow");
+function fillTexturesWithDummy(offset = 0) {
+    for (let i = offset; i < 16; i++) {
+        gl.activeTexture(gl.TEXTURE0 + i);
+        gl.bindTexture(gl.TEXTURE_2D, dummyTexture);
     }
+}
 
-    if (STATE.USE_INSTANCING) {
-        // if we use instancing we have just add data describing the instance
-        const data = new Float32Array([x, y, width, height, r, g, b, a]);
+function setupShaders() {
+    monsterShader = compileShader(
+        "monster",
+        ["view", 'textures'],
+        ['texId'].concat(MONSTER_SHADER_ATTRIBUTES.map(entry => entry.name))
+    );
+    monsterShader.use();
+    gl.uniform1iv(monsterShader.textures, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
 
-        // uploading data to GPU
-        gl.bufferSubData(
-            gl.ARRAY_BUFFER,
-            quadsCount * INSTANCE_STRIDE_IN_BYTES,
-            data
-        );
-        // and to our RAM buffer
-        ramBuffer.set(data, quadsCount * INSTANCE_STRIDE);
-    } else {
-        // in case we don't use instancing we have to duplicate our data
-        // for every vertex of the quad
-        const data = new Float32Array([
-            x,
-            y,
-            r,
-            g,
-            b,
-            a,
+    dummyTexture = gl.createTexture()
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, dummyTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 2, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE, undefined)
 
-            x + width,
-            y,
-            r,
-            g,
-            b,
-            a,
-
-            x,
-            y + height,
-            r,
-            g,
-            b,
-            a,
-
-            x + width,
-            y,
-            r,
-            g,
-            b,
-            a,
-
-            x,
-            y + height,
-            r,
-            g,
-            b,
-            a,
-
-            x + width,
-            y + height,
-            r,
-            g,
-            b,
-            a,
-        ]);
-
-        // uploading data to GPU
-        gl.bufferSubData(
-            gl.ARRAY_BUFFER,
-            quadsCount * QUAD_STRIDE_IN_BYTES,
-            data
-        );
-        // and to our RAM buffer
-        ramBuffer.set(data, quadsCount * QUAD_STRIDE);
-    }
-
-    quadsCount++;
+    fillTexturesWithDummy()
 }
 
 // this function give coordinates to place quads in a grid
@@ -394,27 +194,24 @@ function getRectByNum(num, max_rects) {
 
 // here we create our quads using current placing plan
 function fillBuffer() {
-    for (let i = 0; i < STATE.DEGEN_START_COUNT; i++) {
-        addQuad(0, 0, 0, 0, 0, 0, 0, 0);
-    }
-    for (let i = 0; i < STATE.QUAD_COUNT; i++) {
-        let x, y, width, height;
-        if (STATE.USE_RANDOM_PLACING) {
-            width = randomRange(0.05, 0.2) * 1;
-            height = randomRange(0.05, 0.2) * 1;
-            x = randomRange(-1, 1 - width);
-            y = randomRange(-1, 1 - height);
-        } else {
-            ({ x, y, width, height } = getRectByNum(i, STATE.QUAD_COUNT));
+    /*
+    addDebugTriangle(0, 0,
+        50, 0, 
+        50, 50,
+        1, 0, 0, 0.3)
+    */
+
+    const img = new Image()
+    img.crossOrigin = "anonymous";
+    img.src = '/cat_50.png'
+    img.onload = () => {
+        for (let i = 0; i < 1000; i++) {
+            const scale = 1;
+            addImage(
+                randomRange(0, canvas.width - img.width / scale), randomRange(0, canvas.height - img.height / scale), 
+                img.width / scale, img.height / scale, 
+                img);
         }
-        const r = randomRange(0, 1);
-        const g = randomRange(0, 1);
-        const b = randomRange(0, 1);
-        const a = randomRange(0.2, 0.7);
-        addQuad(x, y, width, height, r, g, b, a);
-    }
-    for (let i = 0; i < STATE.DEGEN_END_COUNT; i++) {
-        addQuad(0, 0, 0, 0, 0, 0, 0, 0);
     }
 }
 
@@ -425,196 +222,401 @@ function outputFPS(timestamp) {
     fpsElement.textContent = `${Math.round(fps)} FPS`;
 }
 
-function draw(timestamp) {
-    outputFPS(timestamp);
-
-    if (STATE.UPDATE_BATCH_EVERY_FRAME) {
-        // upload buffer to GPU
-        // only existing quads, not whole allocated buffer
-        // this is why we need to create another view into our RAM buffer
-        gl.bufferSubData(
-            gl.ARRAY_BUFFER,
-            0,
-            new Float32Array(
-                ramBuffer.buffer,
-                0,
-                quadsCount * (STATE.USE_INSTANCING ? INSTANCE_STRIDE : QUAD_STRIDE)
-            )
-        );
+function outputMemory() {
+    let memory = 0;
+    for (const buffer of buffers) {
+        memory += buffer.atlases.length * (ATLAS_SIZE * ATLAS_SIZE * 4)
     }
+    fpsElement.textContent = `${Math.round(memory / (1024 * 1024))} MB fot Atlases`;
+}
+
+function updateCamera() {
+    view[0] = -canvas.width / 2 - cameraX
+    view[1] = -canvas.height / 2 - cameraY
+    view[2] =  1 / (canvas.width / 2 / scale)
+    view[3] = -1 / (canvas.height / 2 / scale)
+
+    gl.uniform4fv(monsterShader.view, view);
+}
+
+function addPrimitiveVertices(primitiveType: PrimitiveType, data: number[], strideInFloats: number,
+    indices: number[], image?: ImageSource, uvIndexes?: number[]) {
+    const strideInFloatsWithType = strideInFloats + 1
+    if (strideInFloatsWithType > STRIDE_IN_FLOATS) {
+        throw new Error("Not enough attribute slots.")
+    }
+    if (data.length % strideInFloats !== 0) {
+        throw new Error("Data is not aligned with stride.")
+    }
+
+    const vertexCount = data.length / strideInFloats
+    const buffer = getBuffer(vertexCount, indices.length)
+
+    const indexData = new Uint32Array(indices.length)
+    for (let i = 0; i < indices.length; i++) {
+        indexData[i] = buffer.nextVertexIndex + indices[i];
+    }
+
+    const texIdData = new Float32Array(vertexCount)
+    if (image) {
+        if (!uvIndexes) {
+            throw new Error("Texture must include UV.")
+        }
+        const prevAtlasCount = buffer.atlases.length
+        const prevAtlasGroup = Math.trunc(prevAtlasCount / 16)
+
+        const { atlas, space } = getSpaceInAtlas(buffer, image.width, image.height)
+        renderImageToAtlas(atlas, space, image)
+
+        const tx = space.x / ATLAS_SIZE
+        const ty = space.y / ATLAS_SIZE
+
+        const sx = image.width / ATLAS_SIZE
+        const sy = image.height / ATLAS_SIZE
+
+        // transform source uv to atlas uv
+        for (let i = 0; i < vertexCount; i++) {
+            const srcIndex = i * strideInFloats
+
+            data[srcIndex + uvIndexes[0]] = data[srcIndex + uvIndexes[0]] * sx + tx
+            data[srcIndex + uvIndexes[1]] = data[srcIndex + uvIndexes[1]] * sy + ty
+
+            texIdData[i] = 1 + (buffer.atlases.indexOf(atlas) % 16) // hack
+        }
+
+        const currentAtlasCount = buffer.atlases.length
+        const currentAtlasGroup = Math.trunc(currentAtlasCount / 16)
+
+        // ultra hack
+        if (currentAtlasGroup !== prevAtlasGroup) {
+            buffer.drawCalls.push({
+                indexCount: 0,
+                textures: []
+            })
+        }
+        
+        // new atlas? need to push
+        if (currentAtlasCount !== prevAtlasCount) {
+            const lastDrawCall = buffer.drawCalls[buffer.drawCalls.length - 1]
+            lastDrawCall.textures.push(atlas.texture)
+        }
+    }
+
+    const vertexData = new Float32Array(vertexCount * STRIDE_IN_FLOATS)
+    for (let i = 0; i < vertexCount; i++) {
+        const srcIndex = i * strideInFloats
+        const dstIndex = i * STRIDE_IN_FLOATS
+
+        vertexData[dstIndex + 0] = primitiveType
+        for (let j = 0; j < strideInFloats; j++) {
+            vertexData[dstIndex + 1 + j] = data[srcIndex + j]
+        }
+    }
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer.vertexBuffer)
+    gl.bufferSubData(gl.ARRAY_BUFFER, buffer.nextVertexIndex * STRIDE_IN_BYTES, vertexData)
+    // buffer.vertexBufferRAM.set(vertexData, buffer.nextVertexIndex * STRIDE_IN_FLOATS);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer.texIdBuffer)
+    gl.bufferSubData(gl.ARRAY_BUFFER, buffer.nextVertexIndex * Float32Array.BYTES_PER_ELEMENT, texIdData)
+    // buffer.texIdBufferRAM.set(texIdData, buffer.nextVertexIndex);
+
+    buffer.nextVertexIndex += vertexCount
+
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffer.indexBuffer)
+    gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, buffer.nextIndexIndex * Uint32Array.BYTES_PER_ELEMENT,
+        indexData);
+    // buffer.indexBufferRAM.set(indexData, buffer.nextIndexIndex);
+    buffer.nextIndexIndex += indices.length
+
+    const lastDrawCall = buffer.drawCalls[buffer.drawCalls.length - 1]
+    lastDrawCall.indexCount += indices.length;
+}
+
+function addDebugTriangle(x0, y0, x1, y1, x2, y2, r, g, b, a) {
+    addPrimitiveVertices(PrimitiveType.DEBUG_TRIANGLE,
+        [
+            x0, y0, 0, r, g, b, a,
+            x1, y1, 0, r, g, b, a,
+            x2, y2, 0, r, g, b, a
+        ],
+        7,
+        [0, 1, 2]);
+}
+
+// мы говорим - добавь изображение
+// вот т.е. для нас по сути uv это tuv
+// textureId, u, v
+// textureId это id текстуры в текущем блоке отрисовки, т.е. от 0 до 15
+// u, v также нужно апдейтить исходя из места в атласе
+
+function addImage(x: number, y: number, width: number, height: number, image: HTMLImageElement) {
+    addPrimitiveVertices(PrimitiveType.IMAGE,
+        [
+            x,         y,          0, 0, 0, 0,
+            x + width, y,          0, 0, 1, 0,
+            x,         y + height, 0, 0, 0, 1,
+            x + width, y + height, 0, 0, 1, 1,
+        ],
+        6,
+        [0, 1, 2, 1, 2, 3],
+        image,
+        [4, 5]
+    );
+}
+
+function draw(timestamp) {
+    // outputFPS(timestamp);
+    outputMemory()
 
     // filling render target with our blank color
     gl.clear(gl.COLOR_BUFFER_BIT);
 
-    if (quadsCount > 0) {
-        if (STATE.USE_INSTANCING) {
-            // draw all quads using instancing method
-            if (STATE.USE_TRIANGLE_STRIP) {
-                gl_inst.drawArraysInstancedANGLE(
-                    gl.TRIANGLE_STRIP,
-                    0,
-                    4,
-                    quadsCount
-                );
-            } else {
-                gl_inst.drawArraysInstancedANGLE(gl.TRIANGLES, 0, 6, quadsCount);
+    scale *= 1.0004;
+    updateCamera();
+
+    for (const buffer of buffers) {
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffer.indexBuffer)
+        describeVertices(buffer.vertexBuffer, buffer.texIdBuffer)
+
+        let offset = 0;
+        for (const drawCall of buffer.drawCalls) {
+            for (let i = 0; i < drawCall.textures.length; i++) {
+                gl.activeTexture(gl.TEXTURE0 + i);
+                gl.bindTexture(gl.TEXTURE_2D, drawCall.textures[i])
             }
-        } else {
-            if (STATE.SEPARATE_DRAW_CALLS) {
-                // drawing quads in muliple draw calls
-                let currentShader = mainShader;
-                for (
-                    let quadNum = 0;
-                    quadNum < quadsCount;
-                    quadNum += STATE.HOW_MANY_QUADS_PER_CALL
-                ) {
-                    if (STATE.SWITCH_SHADERS_FOR_EACH_DRAW_CALL) {
-                        // choosing another shader
-                        currentShader =
-                            currentShader === mainShader ? shaderForSwitch : mainShader;
-                        currentShader.use();
-                        // we also have to describe all of our attributes after shader switch
-                        describeBuffer(currentShader);
-                    }
-                    // doing our drawCall
-                    gl.drawArrays(
-                        gl.TRIANGLES,
-                        quadNum * 6,
-                        6 * STATE.HOW_MANY_QUADS_PER_CALL
-                    );
-                }
-            } else {
-                // drawing all quads in batch using one drawCall
-                gl.drawArrays(gl.TRIANGLES, 0, quadsCount * 6);
-            }
+
+            gl.drawElements(gl.TRIANGLES, drawCall.indexCount, gl.UNSIGNED_INT, offset);
+            offset += drawCall.indexCount * Uint32Array.BYTES_PER_ELEMENT;
         }
     }
-
-    // gl.finish();
 
     requestAnimationFrame(draw);
 }
 
 requestAnimationFrame(draw);
 
-function describeBuffer(shader) {
-    if (STATE.USE_INSTANCING) {
-        gl.bindBuffer(gl.ARRAY_BUFFER, instancedQuadBuffer);
+function describeVertices(vertexBuffer: WebGLBuffer, texIdBuffer: WebGLBuffer) {
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer)
+    let offset = 0
+    for (const attributeDesc of MONSTER_SHADER_ATTRIBUTES) {
+        const attributeIndex = monsterShader[attributeDesc.name]
         gl.vertexAttribPointer(
-            mainShader.vertexPosition,
-            2,
+            attributeIndex,
+            attributeDesc.size,
             gl.FLOAT,
             false,
-            2 * Float32Array.BYTES_PER_ELEMENT,
-            0 * Float32Array.BYTES_PER_ELEMENT
+            STRIDE_IN_BYTES,
+            offset * Float32Array.BYTES_PER_ELEMENT
         );
-        gl.enableVertexAttribArray(mainShader.vertexPosition);
-        gl_inst.vertexAttribDivisorANGLE(mainShader.vertexPosition, 0);
+        gl.enableVertexAttribArray(attributeIndex);
+        offset += attributeDesc.size
+    }
 
-        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-        gl.vertexAttribPointer(
-            mainShader.vertexOffset,
-            2,
-            gl.FLOAT,
-            false,
-            INSTANCE_STRIDE_IN_BYTES,
-            0 * Float32Array.BYTES_PER_ELEMENT
-        );
-        gl.enableVertexAttribArray(mainShader.vertexOffset);
-        gl_inst.vertexAttribDivisorANGLE(mainShader.vertexOffset, 1);
+    gl.bindBuffer(gl.ARRAY_BUFFER, texIdBuffer)
+    gl.vertexAttribPointer(
+        monsterShader.texId,
+        1,
+        gl.FLOAT,
+        false,
+        Float32Array.BYTES_PER_ELEMENT,
+        0
+    );
+    gl.enableVertexAttribArray(monsterShader.texId);
+}
 
-        gl.vertexAttribPointer(
-            mainShader.vertexScale,
-            2,
-            gl.FLOAT,
-            false,
-            INSTANCE_STRIDE_IN_BYTES,
-            2 * Float32Array.BYTES_PER_ELEMENT
-        );
-        gl.enableVertexAttribArray(mainShader.vertexScale);
-        gl_inst.vertexAttribDivisorANGLE(mainShader.vertexScale, 1);
+function describeVerticesForAtlas() {
+    for (const attributeDesc of MONSTER_SHADER_ATTRIBUTES) {
+        const attributeIndex = monsterShader[attributeDesc.name]
+        gl.disableVertexAttribArray(attributeIndex);
+    }
+    gl.disableVertexAttribArray(monsterShader.texId);
 
-        gl.vertexAttribPointer(
-            mainShader.vertexColor,
-            4,
-            gl.FLOAT,
-            false,
-            INSTANCE_STRIDE_IN_BYTES,
-            4 * Float32Array.BYTES_PER_ELEMENT
-        );
-        gl.enableVertexAttribArray(mainShader.vertexColor);
-        gl_inst.vertexAttribDivisorANGLE(mainShader.vertexColor, 1);
-    } else {
-        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-        gl.vertexAttribPointer(
-            mainShader.vertexPosition,
-            2,
-            gl.FLOAT,
-            false,
-            VERTEX_STRIDE * Float32Array.BYTES_PER_ELEMENT,
-            0 * Float32Array.BYTES_PER_ELEMENT
-        );
-        gl.enableVertexAttribArray(mainShader.vertexPosition);
+    gl.vertexAttribPointer(
+        monsterShader.slot1,
+        4,
+        gl.FLOAT,
+        false,
+        4 * Float32Array.BYTES_PER_ELEMENT,
+        0 * Float32Array.BYTES_PER_ELEMENT
+    );
+    gl.enableVertexAttribArray(monsterShader.slot1);
+}
 
-        gl.vertexAttribPointer(
-            mainShader.vertexColor,
-            4,
-            gl.FLOAT,
-            false,
-            VERTEX_STRIDE * Float32Array.BYTES_PER_ELEMENT,
-            2 * Float32Array.BYTES_PER_ELEMENT
-        );
-        gl.enableVertexAttribArray(mainShader.vertexColor);
+function allocBuffer(): DrawCallBuffer {
+    const vertexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+    gl.bufferData(
+        gl.ARRAY_BUFFER,
+        MAX_VERTICES * STRIDE_IN_BYTES,
+        gl.STREAM_DRAW
+    );
+    const vertexBufferRAM = new Float32Array(MAX_VERTICES * STRIDE_IN_FLOATS);
+
+    const texIdBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, texIdBuffer);
+    gl.bufferData(
+        gl.ARRAY_BUFFER,
+        MAX_VERTICES * Float32Array.BYTES_PER_ELEMENT,
+        gl.STREAM_DRAW
+    );
+    const texIdBufferRAM = new Float32Array(MAX_VERTICES);
+
+    const indexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+    gl.bufferData(
+        gl.ELEMENT_ARRAY_BUFFER,
+        MAX_INDICES * Uint32Array.BYTES_PER_ELEMENT,
+        gl.STREAM_DRAW
+    );
+
+    const indexBufferRAM = new Uint32Array(MAX_INDICES)
+
+    const buffer = {
+        vertexBuffer,
+        texIdBuffer,
+        indexBuffer,
+        vertexBufferRAM,
+        texIdBufferRAM,
+        indexBufferRAM,
+        atlases: [],
+        nextVertexIndex: 0,
+        nextIndexIndex: 0,
+        drawCalls: [
+            {
+                indexCount: 0,
+                textures: []
+            }
+        ]
+    } as DrawCallBuffer
+
+    buffers.push(buffer)
+
+    return buffer
+}
+
+function getBuffer(requiredVertices: number, requiredIndices: number): DrawCallBuffer {
+    const lastBuffer = buffers[buffers.length - 1]
+    if (!lastBuffer) {
+        return allocBuffer()
+    }
+    
+    const remainingVertices = MAX_VERTICES - lastBuffer.nextVertexIndex
+    const remainingIndices = MAX_INDICES - lastBuffer.nextIndexIndex
+
+    if (remainingVertices < requiredVertices || remainingIndices < requiredIndices) {
+        return allocBuffer()
+    }
+
+    return lastBuffer
+}
+
+function allocAtlas(buffer: DrawCallBuffer): Atlas {
+    const texture = gl.createTexture()
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, ATLAS_SIZE, ATLAS_SIZE, 0, gl.RGBA, gl.UNSIGNED_BYTE, undefined)
+
+    // Create and bind the framebuffer
+    const frameBuffer = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, frameBuffer)
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+    
+    const shelf = new (window as any).ShelfPack(ATLAS_SIZE, ATLAS_SIZE, { autoResize: false })
+
+    const atlas = {
+        texture,
+        frameBuffer,
+        shelf,
+        renderInCount: 0,
+    } as Atlas
+
+    buffer.atlases.push(atlas)
+
+    return atlas
+}
+
+function tryFindSpaceForTexture(atlas: Atlas, width: number, height: number) {
+    const bin = atlas.shelf.packOne(width, height)
+    return bin
+}
+
+function getSpaceInAtlas(buffer: DrawCallBuffer, width: number, height: number): SpaceInAtlas {
+    for (let i = 0; i < buffer.atlases.length; i++) {
+        const atlas = buffer.atlases[i]
+        const space = tryFindSpaceForTexture(atlas, width, height)
+        if (space) {
+            return {
+                atlas,
+                space
+            }
+        }
+    }
+    const atlas = allocAtlas(buffer)
+    const space = tryFindSpaceForTexture(atlas, width, height)
+    return {
+        atlas,
+        space
     }
 }
 
-// here we allocaing our buffers for maximum amount of quads possible
-function allocBuffer() {
-    if (STATE.USE_INSTANCING) {
-        instancedQuadBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, instancedQuadBuffer);
-        if (STATE.USE_TRIANGLE_STRIP) {
-            gl.bufferData(
-                gl.ARRAY_BUFFER,
-                new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]),
-                gl.STATIC_DRAW
-            );
-        } else {
-            gl.bufferData(
-                gl.ARRAY_BUFFER,
-                new Float32Array([0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1]),
-                gl.STATIC_DRAW
-            );
-        }
+function renderImageToAtlas(atlas: Atlas, space: Bin, image: ImageSource): void {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, atlas.frameBuffer);
+    gl.viewport(0, 0, ATLAS_SIZE, ATLAS_SIZE);
 
-        buffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-        gl.bufferData(
-            gl.ARRAY_BUFFER,
-            STATE.MAX_QUADS * INSTANCE_STRIDE_IN_BYTES,
-            gl.STATIC_DRAW
-        );
-        ramBuffer = new Float32Array(STATE.MAX_QUADS * INSTANCE_STRIDE);
-    } else {
-        buffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-        gl.bufferData(
-            gl.ARRAY_BUFFER,
-            STATE.MAX_QUADS * QUAD_STRIDE_IN_BYTES,
-            gl.STATIC_DRAW
-        );
+    fillTexturesWithDummy(1);
 
-        ramBuffer = new Float32Array(STATE.MAX_QUADS * QUAD_STRIDE);
-    }
+    const imageTexture = gl.createTexture()
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, imageTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
 
-    describeBuffer(mainShader);
+    gl.bindBuffer(gl.ARRAY_BUFFER, atlasQuad);
+    describeVerticesForAtlas()
+    
+    view[0] = -1 + space.x / (ATLAS_SIZE / 2)
+    view[1] = -1 + space.y / (ATLAS_SIZE / 2)
+    view[2] = image.width / (ATLAS_SIZE / 2)
+    view[3] = image.height / (ATLAS_SIZE / 2)
+    gl.uniform4fv(monsterShader.view, view);
+    
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
+
+    // debugOutputAtlas(atlas.texture, ATLAS_SIZE, ATLAS_SIZE)
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0.0, 0.0, canvas.width, canvas.height);
+
+    atlas.renderInCount++
+}
+
+function debugOutputAtlas(atlas: Atlas, width: number, height: number): void {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, atlas.frameBuffer);
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    const context = canvas.getContext('2d')
+    const imageData = context.createImageData(width, height)
+    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, imageData.data);
+    context.putImageData(imageData, 0, 0)
+    const str = canvas.toDataURL('image/jpeg', 0.1)
+    console.log(str)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 }
 
 // shader util
 
 function compileShader(name, uniforms, attributes) {
-    const vertexShaderCode = shaders[name + ".vert"];
-    const fragmentShaderCode = shaders[name + ".frag"];
+    const vertexShaderCode = document.getElementById(name + '.vert').textContent;
+    const fragmentShaderCode = document.getElementById(name + '.frag').textContent;
 
     const vertexShader = gl.createShader(gl.VERTEX_SHADER);
     const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
@@ -706,4 +708,49 @@ function initRand() {
 
 function randomRange(min, max) {
     return min + rand() * (max - min);
+}
+
+// web-gl debug
+
+function glEnumToString(gl, value) {
+    // Optimization for the most common enum:
+    if (value === gl.NO_ERROR) {
+        return "NO_ERROR";
+    }
+    for (const p in gl) {
+        if (gl[p] === value) {
+            return p;
+        }
+    }
+    return "0x" + value.toString(16);
+}
+
+function createGLErrorWrapper(context, fname) {
+    return function() {
+        const rv = context[fname].apply(context, arguments);
+        const err = context.getError();
+        if (err !== context.NO_ERROR) {
+            throw "GL error " + glEnumToString(context, err) + " in " + fname;
+        }
+        return rv;
+    };
+}
+
+function create3DContextWithWrapperThatThrowsOnGLError(context: WebGLRenderingContext): WebGLRenderingContext {
+    const wrap = {} as any;
+    for (const i in context) {
+        try {
+            if (typeof context[i] === 'function') {
+                wrap[i] = createGLErrorWrapper(context, i);
+            } else {
+                wrap[i] = context[i];
+            }
+        } catch (e) {
+            throw new Error("createContextWrapperThatThrowsOnGLError: Error accessing " + i);
+        }
+    }
+    wrap.getError = function() {
+        return context.getError();
+    };
+    return wrap as WebGLRenderingContext;
 }

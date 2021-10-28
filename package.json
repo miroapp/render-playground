@@ -4,7 +4,7 @@
   "description": "WebGL-related experiments",
   "source": "src/index.html",
   "scripts": {
-    "start": "parcel",
+    "start": "parcel src/index.html src/**/*",
     "build": "parcel build"
   },
   "repository": {
