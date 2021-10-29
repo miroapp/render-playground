@@ -20,6 +20,15 @@
   "homepage": "https://github.com/miroapp/render-playground#readme",
   "devDependencies": {
     "parcel": "^2.0.0",
+    "parcel-plugin-static-files-copy": "^2.6.0",
     "typescript": "^4.4.4"
+  },
+  "staticFiles": {
+    "staticPath": [
+      "Box2D_v2.3.1_min.wasm.wasm"
+    ]
+  },
+  "dependencies": {
+    "@parcel/transformer-raw": "^2.0.0"
   }
 }

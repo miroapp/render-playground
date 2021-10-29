@@ -23,6 +23,7 @@
     <canvas id="scene"></canvas>
     <div id="monster.vert" style="display: none">
       uniform vec4 view;
+      uniform vec4 uvs[16];
 
       attribute vec4 slot1;
       attribute vec4 slot2;
@@ -50,8 +51,8 @@
           fragTUV = vec3(texId, slot2.y, slot2.z);
         // render_to_texture
         } else if (type < 3.5) {
-          fragTUV = vec3(1.0, slot1.yz);
-          gl_Position = vec4(slot1.yz * view.zw + view.xy, 0.5, 1);
+          fragTUV = slot1.yzw;
+          gl_Position = vec4(slot2.xy, 0.5, 1);
           return;
         }
 
@@ -64,11 +65,10 @@
       precision lowp sampler2D;
 
       uniform sampler2D textures[16];
-      uniform float debugSkew;
 
       varying vec4 fragColor;
       varying vec3 fragTUV;
-        
+
       void main()
       {
         vec4 color;
@@ -133,6 +133,7 @@
     </div>
     <script src="earcut.min.js"></script>
     <script src="shelf-pack.min.js"></script>
+    <script type="module" src="Box2D_v2.3.1_min.wasm.js"></script>
     <script src="index.ts"></script>
   </body>
 </html>

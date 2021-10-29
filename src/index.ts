@@ -82,8 +82,12 @@ type DrawCallBuffer = {
 }
 
 const buffers = [] as DrawCallBuffer[] // vertex buffer + index buffer goes here
+let debugTextureWithoutAtlasesMemoryCount: number = 0
 
-let atlasQuad: WebGLBuffer
+let atlasQuads: WebGLBuffer
+let atlasQuadsDestUVs: WebGLBuffer
+let atlasQuadsDestUVsBuffer: Float32Array;
+let atlasQuadsIndices: WebGLBuffer
 
 // fps output
 let lastFrameTimestamp = 0;
@@ -111,7 +115,7 @@ function setupCanvas() {
 }
 
 function setupWebGL() {
-    gl = create3DContextWithWrapperThatThrowsOnGLError(canvas.getContext("webgl", {
+    gl = (canvas.getContext("webgl", {
         alpha: true,
         premultipliedAlpha: false,
         stencil: false,
@@ -133,14 +137,113 @@ function setupWebGL() {
 }
 
 function setupAtlasRenderer() {
-    atlasQuad = gl.createBuffer()
-    gl.bindBuffer(gl.ARRAY_BUFFER, atlasQuad)
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-        PrimitiveType.RENDER_TO_TEXTURE, 0, 0, 0, 
-        PrimitiveType.RENDER_TO_TEXTURE, 1, 0, 0,
-        PrimitiveType.RENDER_TO_TEXTURE, 0, 1, 0,
+    const atlasQuadsBuffer = new Float32Array([
+        PrimitiveType.RENDER_TO_TEXTURE, 1, 0, 0, 
         PrimitiveType.RENDER_TO_TEXTURE, 1, 1, 0,
-    ]), gl.STATIC_DRAW)
+        PrimitiveType.RENDER_TO_TEXTURE, 1, 0, 1,
+        PrimitiveType.RENDER_TO_TEXTURE, 1, 1, 1,
+
+        PrimitiveType.RENDER_TO_TEXTURE, 2, 0, 0, 
+        PrimitiveType.RENDER_TO_TEXTURE, 2, 1, 0,
+        PrimitiveType.RENDER_TO_TEXTURE, 2, 0, 1,
+        PrimitiveType.RENDER_TO_TEXTURE, 2, 1, 1,
+
+        PrimitiveType.RENDER_TO_TEXTURE, 3, 0, 0, 
+        PrimitiveType.RENDER_TO_TEXTURE, 3, 1, 0,
+        PrimitiveType.RENDER_TO_TEXTURE, 3, 0, 1,
+        PrimitiveType.RENDER_TO_TEXTURE, 3, 1, 1,
+
+        PrimitiveType.RENDER_TO_TEXTURE, 4, 0, 0, 
+        PrimitiveType.RENDER_TO_TEXTURE, 4, 1, 0,
+        PrimitiveType.RENDER_TO_TEXTURE, 4, 0, 1,
+        PrimitiveType.RENDER_TO_TEXTURE, 4, 1, 1,
+
+        PrimitiveType.RENDER_TO_TEXTURE, 5, 0, 0, 
+        PrimitiveType.RENDER_TO_TEXTURE, 5, 1, 0,
+        PrimitiveType.RENDER_TO_TEXTURE, 5, 0, 1,
+        PrimitiveType.RENDER_TO_TEXTURE, 5, 1, 1,
+        
+        PrimitiveType.RENDER_TO_TEXTURE, 6, 0, 0, 
+        PrimitiveType.RENDER_TO_TEXTURE, 6, 1, 0,
+        PrimitiveType.RENDER_TO_TEXTURE, 6, 0, 1,
+        PrimitiveType.RENDER_TO_TEXTURE, 6, 1, 1,
+
+        PrimitiveType.RENDER_TO_TEXTURE, 7, 0, 0, 
+        PrimitiveType.RENDER_TO_TEXTURE, 7, 1, 0,
+        PrimitiveType.RENDER_TO_TEXTURE, 7, 0, 1,
+        PrimitiveType.RENDER_TO_TEXTURE, 7, 1, 1,
+
+        PrimitiveType.RENDER_TO_TEXTURE, 8, 0, 0, 
+        PrimitiveType.RENDER_TO_TEXTURE, 8, 1, 0,
+        PrimitiveType.RENDER_TO_TEXTURE, 8, 0, 1,
+        PrimitiveType.RENDER_TO_TEXTURE, 8, 1, 1,
+
+        PrimitiveType.RENDER_TO_TEXTURE, 9, 0, 0, 
+        PrimitiveType.RENDER_TO_TEXTURE, 9, 1, 0,
+        PrimitiveType.RENDER_TO_TEXTURE, 9, 0, 1,
+        PrimitiveType.RENDER_TO_TEXTURE, 9, 1, 1,
+
+        PrimitiveType.RENDER_TO_TEXTURE, 10, 0, 0, 
+        PrimitiveType.RENDER_TO_TEXTURE, 10, 1, 0,
+        PrimitiveType.RENDER_TO_TEXTURE, 10, 0, 1,
+        PrimitiveType.RENDER_TO_TEXTURE, 10, 1, 1,
+
+        PrimitiveType.RENDER_TO_TEXTURE, 11, 0, 0, 
+        PrimitiveType.RENDER_TO_TEXTURE, 11, 1, 0,
+        PrimitiveType.RENDER_TO_TEXTURE, 11, 0, 1,
+        PrimitiveType.RENDER_TO_TEXTURE, 11, 1, 1,
+
+        PrimitiveType.RENDER_TO_TEXTURE, 12, 0, 0, 
+        PrimitiveType.RENDER_TO_TEXTURE, 12, 1, 0,
+        PrimitiveType.RENDER_TO_TEXTURE, 12, 0, 1,
+        PrimitiveType.RENDER_TO_TEXTURE, 12, 1, 1,
+
+        PrimitiveType.RENDER_TO_TEXTURE, 13, 0, 0, 
+        PrimitiveType.RENDER_TO_TEXTURE, 13, 1, 0,
+        PrimitiveType.RENDER_TO_TEXTURE, 13, 0, 1,
+        PrimitiveType.RENDER_TO_TEXTURE, 13, 1, 1,
+
+        PrimitiveType.RENDER_TO_TEXTURE, 14, 0, 0, 
+        PrimitiveType.RENDER_TO_TEXTURE, 14, 1, 0,
+        PrimitiveType.RENDER_TO_TEXTURE, 14, 0, 1,
+        PrimitiveType.RENDER_TO_TEXTURE, 14, 1, 1,
+
+        PrimitiveType.RENDER_TO_TEXTURE, 15, 0, 0, 
+        PrimitiveType.RENDER_TO_TEXTURE, 15, 1, 0,
+        PrimitiveType.RENDER_TO_TEXTURE, 15, 0, 1,
+        PrimitiveType.RENDER_TO_TEXTURE, 15, 1, 1,
+
+        PrimitiveType.RENDER_TO_TEXTURE, 16, 0, 0, 
+        PrimitiveType.RENDER_TO_TEXTURE, 16, 1, 0,
+        PrimitiveType.RENDER_TO_TEXTURE, 16, 0, 1,
+        PrimitiveType.RENDER_TO_TEXTURE, 16, 1, 1,
+    ])
+
+    atlasQuads = gl.createBuffer()
+    gl.bindBuffer(gl.ARRAY_BUFFER, atlasQuads)
+    gl.bufferData(gl.ARRAY_BUFFER, atlasQuadsBuffer, gl.STATIC_DRAW)
+
+    atlasQuadsDestUVs = gl.createBuffer()
+    gl.bindBuffer(gl.ARRAY_BUFFER, atlasQuadsDestUVs)
+    gl.bufferData(gl.ARRAY_BUFFER, 16 * (4 * 4) * Float32Array.BYTES_PER_ELEMENT, gl.DYNAMIC_DRAW);
+    atlasQuadsDestUVsBuffer = new Float32Array(16 * (4 * 4));
+
+    atlasQuadsIndices = gl.createBuffer()
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, atlasQuadsIndices)
+    const indices = new Uint16Array(16 * 6);
+    let j = 0;
+    for (let i = 0; i < indices.length; i += 6) {
+        indices[i + 0] = j + 0;
+        indices[i + 1] = j + 1;
+        indices[i + 2] = j + 2;
+
+        indices[i + 3] = j + 1;
+        indices[i + 4] = j + 2;
+        indices[i + 5] = j + 3;
+
+        j += 4;
+    }
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
 }
 
 function fillTexturesWithDummy(offset = 0) {
@@ -153,7 +256,7 @@ function fillTexturesWithDummy(offset = 0) {
 function setupShaders() {
     monsterShader = compileShader(
         "monster",
-        ["view", 'textures'],
+        ["view", 'textures', 'views'],
         ['texId'].concat(MONSTER_SHADER_ATTRIBUTES.map(entry => entry.name))
     );
     monsterShader.use();
@@ -192,8 +295,89 @@ function getRectByNum(num, max_rects) {
     };
 }
 
+function loadImage(url) {
+    return new Promise((resolve, reject) => {
+        const img = new Image()
+        img.onload = () => {
+            resolve(img)
+        }
+        img.onerror = () => reject(url);
+        img.src = url;
+    })
+}
+
+async function getImagePositionsWithoutIntersections(images) {
+    const Box2DStartup = (window as any).Box2D
+    const Box2D = await Box2DStartup()
+    const gravity = new Box2D.b2Vec2(0.0, 0.0);
+    const world = new Box2D.b2World(gravity);
+    world.SetContinuousPhysics(false)
+
+    const positions = []
+
+    const toBox2D = 1 / 10;
+    const fromBox2D = 1 / toBox2D
+
+    let dist = 50;
+    for (const image of images) {
+        const shape = new Box2D.b2PolygonShape();
+        shape.SetAsBox(image.width / 2 * toBox2D, image.height / 2 * toBox2D);
+
+        const bd = new Box2D.b2BodyDef();
+        bd.set_type(Box2D.b2_dynamicBody);
+
+        const angle = dist / 25
+        const s = Math.sin(angle)
+        const c = Math.cos(angle)
+
+        const x = s * dist;
+        const y = c * dist;
+
+        const init_pos = new Box2D.b2Vec2(
+            (canvas.width / 2 + x) * toBox2D, 
+            (canvas.height / 2 + y) * toBox2D);
+
+        dist += 50000 / dist
+
+        bd.set_position(init_pos);
+        bd.set_linearDamping(0.01);
+        const body = world.CreateBody(bd);
+        body.CreateFixture(shape, 5.0);
+        body.SetFixedRotation(true);
+        body.SetAwake(true)
+        const init_velocity = new Box2D.b2Vec2(
+            randomRange(-10, 10) * toBox2D, 
+            randomRange(-10, 10) * toBox2D);
+        body.SetLinearVelocity(init_velocity)
+
+        positions.push({
+            x: undefined,
+            y: undefined,
+            width: image.width,
+            height: image.height,
+            body
+        })
+    }
+
+    console.time('calc positions')
+
+    for (let i = 0; i < 100; i++) {
+        world.Step(1, 5, 50);
+    }
+
+    for (const position of positions) {
+        const pos = position.body.GetPosition();
+        position.x = pos.get_x() * fromBox2D - position.width / 2
+        position.y = pos.get_y() * fromBox2D - position.height / 2
+    }
+
+    console.timeEnd('calc positions')
+
+    return positions;
+}
+
 // here we create our quads using current placing plan
-function fillBuffer() {
+async function fillBuffer() {
     /*
     addDebugTriangle(0, 0,
         50, 0, 
@@ -201,17 +385,19 @@ function fillBuffer() {
         1, 0, 0, 0.3)
     */
 
-    const img = new Image()
-    img.crossOrigin = "anonymous";
-    img.src = '/cat_50.png'
-    img.onload = () => {
-        for (let i = 0; i < 1000; i++) {
-            const scale = 1;
-            addImage(
-                randomRange(0, canvas.width - img.width / scale), randomRange(0, canvas.height - img.height / scale), 
-                img.width / scale, img.height / scale, 
-                img);
-        }
+    const promises = []
+    for (let i = 1; i <= 1000; i++) {
+        promises.push(loadImage(`/images/${i}.jpg`))
+    }
+    const originalImages = await Promise.all(promises)
+    const images = originalImages
+
+    const positions = await getImagePositionsWithoutIntersections(images)
+
+    for (let i = 0; i < images.length; i++) {
+        const img = images[i]
+        const pos = positions[i]
+        addImage(pos.x, pos.y, img.width, img.height, img);
     }
 }
 
@@ -227,7 +413,11 @@ function outputMemory() {
     for (const buffer of buffers) {
         memory += buffer.atlases.length * (ATLAS_SIZE * ATLAS_SIZE * 4)
     }
-    fpsElement.textContent = `${Math.round(memory / (1024 * 1024))} MB fot Atlases`;
+
+    const wastedPercent = Math.round((1 - (debugTextureWithoutAtlasesMemoryCount / memory)) * 100);
+    const atlasMB = Math.round(memory / (1024 * 1024))
+
+    fpsElement.textContent = `${atlasMB} MB fot Atlases, ${wastedPercent}% wasted`;
 }
 
 function updateCamera() {
@@ -266,7 +456,7 @@ function addPrimitiveVertices(primitiveType: PrimitiveType, data: number[], stri
         const prevAtlasGroup = Math.trunc(prevAtlasCount / 16)
 
         const { atlas, space } = getSpaceInAtlas(buffer, image.width, image.height)
-        renderImageToAtlas(atlas, space, image)
+        addRenderToAtlasQueue(atlas, space, image)
 
         const tx = space.x / ATLAS_SIZE
         const ty = space.y / ATLAS_SIZE
@@ -369,10 +559,12 @@ function draw(timestamp) {
     // outputFPS(timestamp);
     outputMemory()
 
+    processAtlasGenerationQueue()
+
     // filling render target with our blank color
     gl.clear(gl.COLOR_BUFFER_BIT);
 
-    scale *= 1.0004;
+    scale *= 0.999;
     updateCamera();
 
     for (const buffer of buffers) {
@@ -425,13 +617,14 @@ function describeVertices(vertexBuffer: WebGLBuffer, texIdBuffer: WebGLBuffer) {
     gl.enableVertexAttribArray(monsterShader.texId);
 }
 
-function describeVerticesForAtlas() {
+function describeVerticesForAtlas(quadsBuffer: WebGLBuffer, quadsDestUVsBuffer: WebGLBuffer) {
     for (const attributeDesc of MONSTER_SHADER_ATTRIBUTES) {
         const attributeIndex = monsterShader[attributeDesc.name]
         gl.disableVertexAttribArray(attributeIndex);
     }
     gl.disableVertexAttribArray(monsterShader.texId);
 
+    gl.bindBuffer(gl.ARRAY_BUFFER, quadsBuffer);
     gl.vertexAttribPointer(
         monsterShader.slot1,
         4,
@@ -441,6 +634,17 @@ function describeVerticesForAtlas() {
         0 * Float32Array.BYTES_PER_ELEMENT
     );
     gl.enableVertexAttribArray(monsterShader.slot1);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, quadsDestUVsBuffer);
+    gl.vertexAttribPointer(
+        monsterShader.slot2,
+        4,
+        gl.FLOAT,
+        false,
+        4 * Float32Array.BYTES_PER_ELEMENT,
+        0 * Float32Array.BYTES_PER_ELEMENT
+    );
+    gl.enableVertexAttribArray(monsterShader.slot2);
 }
 
 function allocBuffer(): DrawCallBuffer {
@@ -564,38 +768,97 @@ function getSpaceInAtlas(buffer: DrawCallBuffer, width: number, height: number):
     }
 }
 
-function renderImageToAtlas(atlas: Atlas, space: Bin, image: ImageSource): void {
-    gl.bindFramebuffer(gl.FRAMEBUFFER, atlas.frameBuffer);
-    gl.viewport(0, 0, ATLAS_SIZE, ATLAS_SIZE);
+type AtlasQueueEntry = {
+    space: Bin
+    image: ImageSource
+}
+
+const atlasGenerationQueue = new Map<Atlas, AtlasQueueEntry[]>()
+
+function addRenderToAtlasQueue(atlas: Atlas, space: Bin, image: ImageSource): void {
+    debugTextureWithoutAtlasesMemoryCount += (image.width * image.height * 4)
+
+    let entries = atlasGenerationQueue.get(atlas)
+    if (!entries) {
+        entries = []
+        atlasGenerationQueue.set(atlas, entries)
+    }
+    entries.push({
+        space,
+        image
+    })
+}
+
+function processAtlasGenerationQueue(): void {
+    if (atlasGenerationQueue.size < 1) {
+        return
+    }
+
+    console.time('atlas processing')
 
     fillTexturesWithDummy(1);
+    gl.viewport(0, 0, ATLAS_SIZE, ATLAS_SIZE);
 
-    const imageTexture = gl.createTexture()
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, imageTexture);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, atlasQuadsIndices);
+    describeVerticesForAtlas(atlasQuads, atlasQuadsDestUVs)
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, atlasQuad);
-    describeVerticesForAtlas()
+    atlasGenerationQueue.forEach((entries, atlas) => {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, atlas.frameBuffer);
+
+        for (let i = 0; i < entries.length; i += 16) {
+            const entriesCount = Math.min(entries.length - i, 16);
+            for (let j = 0; j < entriesCount; j++) {
+                const { space, image } = entries[i + j];
+
+                const uv = [
+                    0, 0,
+                    1, 0,
+                    0, 1,
+                    1, 1,
+                ]
+
+                const offsetX = -1 + space.x / (ATLAS_SIZE / 2)
+                const offsetY = -1 + space.y / (ATLAS_SIZE / 2)
+                const scaleX = image.width / (ATLAS_SIZE / 2)
+                const scaleY = image.height / (ATLAS_SIZE / 2)
+
+                let bufferIndex = j * (4 * 4);
+                for (let k = 0; k < uv.length; k += 2) {
+                    const u = uv[k + 0] * scaleX + offsetX
+                    const v = uv[k + 1] * scaleY + offsetY
+
+                    atlasQuadsDestUVsBuffer[bufferIndex + 0] = u;
+                    atlasQuadsDestUVsBuffer[bufferIndex + 1] = v;
+
+                    bufferIndex += 4;
+                }
+
+                const imageTexture = gl.createTexture()
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, imageTexture);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+
+                gl.activeTexture(gl.TEXTURE0 + j);
+                gl.bindTexture(gl.TEXTURE_2D, imageTexture);
+                
+            }
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, atlasQuadsDestUVs);
+            gl.bufferSubData(gl.ARRAY_BUFFER, 0, atlasQuadsDestUVsBuffer);
+
+            gl.drawElements(gl.TRIANGLES, entriesCount * 6, gl.UNSIGNED_SHORT, 0);
+        }
+    })
+    atlasGenerationQueue.clear()
     
-    view[0] = -1 + space.x / (ATLAS_SIZE / 2)
-    view[1] = -1 + space.y / (ATLAS_SIZE / 2)
-    view[2] = image.width / (ATLAS_SIZE / 2)
-    view[3] = image.height / (ATLAS_SIZE / 2)
-    gl.uniform4fv(monsterShader.view, view);
-    
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
-
-    // debugOutputAtlas(atlas.texture, ATLAS_SIZE, ATLAS_SIZE)
-
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0.0, 0.0, canvas.width, canvas.height);
 
-    atlas.renderInCount++
+    console.timeEnd('atlas processing')
 }
 
 function debugOutputAtlas(atlas: Atlas, width: number, height: number): void {
