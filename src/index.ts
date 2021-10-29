@@ -5,7 +5,7 @@ const MAX_INDICES = MAX_TRIANGLES * 3; // but each triangle will still have 3 in
 type ImageSource = HTMLImageElement | HTMLCanvasElement | ImageData
 
 enum PrimitiveType {
-    DEBUG_TRIANGLE = 1,
+    TRIANGLE_WITH_COLOR = 1,
     IMAGE = 2,
     RENDER_TO_TEXTURE = 3
 }
@@ -45,6 +45,21 @@ let scale = 1
 const view = new Float32Array(4) // x, y, sx, sy
 
 let ATLAS_SIZE
+
+const SHAPE_STAR = [
+    119.96963500976562, 194.0947265625,
+    47.98785400390625, 242.618408203125,
+    59.98481750488281, 152.84959716796874,
+    0, 92.1949951171875,
+    83.97874450683594, 80.06407470703125,
+    119.96963500976562, 0,
+    155.9605255126953, 80.06407470703125,
+    239.93927001953125, 92.1949951171875,
+    179.95445251464844, 152.84959716796874,
+    191.951416015625, 242.618408203125,
+    119.96963500976562, 194.0947265625,
+    119.96963500976562, 194.0947265625,
+]
 
 type Atlas = {
     texture: WebGLTexture
@@ -375,6 +390,9 @@ async function getElementsPositionsWithoutIntersections(elements) {
         const pos = position.body.GetPosition();
         position.x = pos.get_x() * fromBox2D - position.width / 2
         position.y = pos.get_y() * fromBox2D - position.height / 2
+
+        position.x = (position.x - canvas.width / 2) * 0.5 + canvas.width / 2
+        position.y = (position.y - canvas.height / 2) * 0.5 + canvas.height / 2
     }
 
     console.timeEnd('calc positions')
@@ -416,8 +434,63 @@ function renderText(text: string, font: string, color: string, size) {
     return data
 }
 
+function getShapeSize(points: number[]) {
+    let width = 0;
+    let height = 0;
+
+    for (let i = 0; i < points.length; i += 2) {
+        const x = points[i + 0]
+        const y = points[i + 1]
+
+        width = Math.max(width, x);
+        height = Math.max(height, y);
+    }
+
+    return {
+        width,
+        height
+    }
+}
+
 // here we create our quads using current placing plan
 async function fillBuffer() {
+    const shapes = []
+
+    const shapeSize = getShapeSize(SHAPE_STAR);
+    for (let i = 0; i < 30000; i++) {
+        shapes.push({
+            width: shapeSize.width,
+            height: shapeSize.height,
+            shape: SHAPE_STAR,
+            color: {
+                r: randomRange(0, 1),
+                g: randomRange(0, 1),
+                b: randomRange(0, 1),
+                a: randomRange(0.2, 0.8)
+            }
+        })
+    }
+
+    const lines = []
+    for (let i = 0; i < 30000; i++) {
+        const width = randomRange(10, 500)
+        const height = randomRange(10, 500)
+
+        lines.push({
+            width,
+            height,
+            line: {
+                width: randomRange(5, 50),
+            },
+            color: {
+                r: randomRange(0, 1),
+                g: randomRange(0, 1),
+                b: randomRange(0, 1),
+                a: randomRange(0.2, 0.8)
+            }
+        })
+    }
+
     console.time('text rendering')
 
     const texts = []
@@ -440,7 +513,7 @@ async function fillBuffer() {
     }
     const images = await Promise.all(promises)
 
-    const combination = texts.concat(images);
+    const combination = [].concat(texts, images, shapes, lines);
     const randomCombination = []
     for (const element of combination) {
         randomCombination.splice(Math.round(randomRange(0, randomCombination.length - 1)), 0, element);
@@ -451,15 +524,17 @@ async function fillBuffer() {
     for (let i = 0; i < randomCombination.length; i++) {
         const element = randomCombination[i]
         const pos = positions[i]
-        addImage(pos.x, pos.y, element.width, element.height, element.texture || element);
+        if (element.line) {
+            addLine([pos.x, pos.y, pos.x + element.width, pos.y + element.height], 
+                element.line.width, element.line.width,
+                element.color.r, element.color.g, element.color.b, element.color.a);
+        } else if (element.shape) {
+            addShape(SHAPE_STAR, pos.x, pos.y, 
+                element.color.r, element.color.g, element.color.b, element.color.a);
+        } else {
+            addImage(pos.x, pos.y, element.width, element.height, element.texture || element);
+        }
     }
-}
-
-function outputFPS(timestamp) {
-    const frameTime = Math.max(timestamp - lastFrameTimestamp, 1);
-    const fps = 1000 / frameTime; // TODO this needs to be more accured
-    lastFrameTimestamp = timestamp;
-    fpsElement.textContent = `${Math.round(fps)} FPS`;
 }
 
 function outputMemory() {
@@ -577,17 +652,6 @@ function addPrimitiveVertices(primitiveType: PrimitiveType, data: number[], stri
     lastDrawCall.indexCount += indices.length;
 }
 
-function addDebugTriangle(x0, y0, x1, y1, x2, y2, r, g, b, a) {
-    addPrimitiveVertices(PrimitiveType.DEBUG_TRIANGLE,
-        [
-            x0, y0, 0, r, g, b, a,
-            x1, y1, 0, r, g, b, a,
-            x2, y2, 0, r, g, b, a
-        ],
-        7,
-        [0, 1, 2]);
-}
-
 // мы говорим - добавь изображение
 // вот т.е. для нас по сути uv это tuv
 // textureId, u, v
@@ -609,8 +673,83 @@ function addImage(x: number, y: number, width: number, height: number, image: HT
     );
 }
 
+function addLine(coordinates: number[], lineWidthInside: number, lineWidthOutside: number,
+    r: number, g: number, b: number, a: number) {
+    if (coordinates.length % 2 !== 0) {
+        throw new Error('Invalid coordinates.')
+    }
+    const pointsCount = coordinates.length / 2;
+    if (pointsCount < 2) {
+        throw new Error("Line should consist of two or more points.")
+    }
+
+    const vertices = []
+    const indices = []
+
+    let startIndex = 0;
+    for (let i = 0; i < coordinates.length - 2; i += 2) {
+        const x0 = coordinates[i + 0];
+        const y0 = coordinates[i + 1];
+
+        const x1 = coordinates[i + 2];
+        const y1 = coordinates[i + 3];
+
+        const dx = x1 - x0;
+        const dy = y1 - y0;
+
+        const len = Math.sqrt(dx * dx + dy * dy);
+
+        const nx = -dy / len
+        const ny =  dx / len
+
+        vertices.push(
+            x0 + nx * lineWidthOutside, y0 + ny * lineWidthOutside, 0,
+            r, g, b, a,
+
+            x0 - nx * lineWidthInside, y0 - ny * lineWidthInside, 0,
+            r, g, b, a,
+
+            x1 + nx * lineWidthOutside, y1 + ny * lineWidthOutside, 0,
+            r, g, b, a,
+
+            x1 - nx * lineWidthInside, y1 - ny * lineWidthInside, 0,
+            r, g, b, a,
+        )
+
+        indices.push(
+            startIndex + 0,
+            startIndex + 1,
+            startIndex + 2,
+
+            startIndex + 1,
+            startIndex + 2,
+            startIndex + 3,
+        )
+
+        startIndex += 4;
+    }
+
+    addPrimitiveVertices(PrimitiveType.TRIANGLE_WITH_COLOR, vertices, 7, indices);
+}
+
+function addShape(points: number[], x: number, y: number, r: number, g: number, b: number, a: number) {
+    const earcut = (window as any).earcut;
+
+    const indices = earcut(points);
+
+    const vertices = [];
+
+    for (let i = 0; i < points.length; i += 2) {
+        const vx = points[i + 0] + x;
+        const vy = points[i + 1] + y;
+
+        vertices.push(vx, vy, 0, r, g, b, a);
+    }
+
+    addPrimitiveVertices(PrimitiveType.TRIANGLE_WITH_COLOR, vertices, 7, indices);
+}
+
 function draw(timestamp) {
-    // outputFPS(timestamp);
     outputMemory()
 
     processAtlasGenerationQueue()
