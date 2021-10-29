@@ -2,7 +2,7 @@ const MAX_VERTICES = 200000; // this is the maximum amount of vertices we can ad
 const MAX_TRIANGLES = MAX_VERTICES; // lets just say one triangle have at least 1 unique vertex (quite a stretch actually)
 const MAX_INDICES = MAX_TRIANGLES * 3; // but each triangle will still have 3 indices
 
-type ImageSource = HTMLImageElement | HTMLCanvasElement
+type ImageSource = HTMLImageElement | HTMLCanvasElement | ImageData
 
 enum PrimitiveType {
     DEBUG_TRIANGLE = 1,
@@ -33,6 +33,12 @@ let gl: WebGLRenderingContext;
 
 let monsterShader;
 let dummyTexture
+
+// text generation
+const textCanvas = document.createElement('canvas')
+textCanvas.width = 1024;
+textCanvas.height = 1024;
+const textContext = textCanvas.getContext('2d')
 
 let cameraX = 0, cameraY = 0
 let scale = 1
@@ -306,7 +312,7 @@ function loadImage(url) {
     })
 }
 
-async function getImagePositionsWithoutIntersections(images) {
+async function getElementsPositionsWithoutIntersections(elements) {
     const Box2DStartup = (window as any).Box2D
     const Box2D = await Box2DStartup()
     const gravity = new Box2D.b2Vec2(0.0, 0.0);
@@ -319,9 +325,9 @@ async function getImagePositionsWithoutIntersections(images) {
     const fromBox2D = 1 / toBox2D
 
     let dist = 50;
-    for (const image of images) {
+    for (const element of elements) {
         const shape = new Box2D.b2PolygonShape();
-        shape.SetAsBox(image.width / 2 * toBox2D, image.height / 2 * toBox2D);
+        shape.SetAsBox(element.width / 2 * toBox2D, element.height / 2 * toBox2D);
 
         const bd = new Box2D.b2BodyDef();
         bd.set_type(Box2D.b2_dynamicBody);
@@ -353,8 +359,8 @@ async function getImagePositionsWithoutIntersections(images) {
         positions.push({
             x: undefined,
             y: undefined,
-            width: image.width,
-            height: image.height,
+            width: element.width,
+            height: element.height,
             body
         })
     }
@@ -376,28 +382,76 @@ async function getImagePositionsWithoutIntersections(images) {
     return positions;
 }
 
+function getTextSizeInPixels(text: string, font: string) {
+    textContext.font = font;
+    const measures = textContext.measureText(text)
+
+    const width = measures.width;
+    const height = measures.fontBoundingBoxAscent + measures.fontBoundingBoxDescent;
+
+    return {
+        width,
+        height
+    }
+}
+
+function generateRandomText(): string {
+    const n1 = Math.round(randomRange(0, 9))
+    const n2 = Math.round(randomRange(0, 9))
+    const n3 = Math.round(randomRange(0, 9))
+    const n4 = Math.round(randomRange(0, 9))
+    const n5 = Math.round(randomRange(0, 9))
+
+    return `${n1}M${n2}I${n3}R${n4}O${n5}`
+}
+
+function renderText(text: string, font: string, color: string, size) {
+    textContext.font = font;
+    textContext.fillStyle = color;
+    textContext.textAlign = 'left';
+    textContext.textBaseline = 'top'
+    textContext.clearRect(0, 0, size.width, size.height)
+    textContext.fillText(text, 0, 0);
+    const data = textContext.getImageData(0, 0, size.width, size.height)
+    return data
+}
+
 // here we create our quads using current placing plan
 async function fillBuffer() {
-    /*
-    addDebugTriangle(0, 0,
-        50, 0, 
-        50, 50,
-        1, 0, 0, 0.3)
-    */
+    console.time('text rendering')
+
+    const texts = []
+    for (let i = 0; i < 3000; i++) {
+        const font = `${Math.round(randomRange(8, 128))}px Arial`
+        const text = generateRandomText()
+        const size = getTextSizeInPixels(text, font);
+        const texture = renderText(text, font, '#000000', size);
+        texts.push({
+            width: size.width,
+            height: size.height,
+            texture
+        })
+    }
+    console.timeEnd('text rendering')
 
     const promises = []
     for (let i = 1; i <= 1000; i++) {
         promises.push(loadImage(`/images/${i}.jpg`))
     }
-    const originalImages = await Promise.all(promises)
-    const images = originalImages
+    const images = await Promise.all(promises)
 
-    const positions = await getImagePositionsWithoutIntersections(images)
+    const combination = texts.concat(images);
+    const randomCombination = []
+    for (const element of combination) {
+        randomCombination.splice(Math.round(randomRange(0, randomCombination.length - 1)), 0, element);
+    }
 
-    for (let i = 0; i < images.length; i++) {
-        const img = images[i]
+    const positions = await getElementsPositionsWithoutIntersections(randomCombination)
+
+    for (let i = 0; i < randomCombination.length; i++) {
+        const element = randomCombination[i]
         const pos = positions[i]
-        addImage(pos.x, pos.y, img.width, img.height, img);
+        addImage(pos.x, pos.y, element.width, element.height, element.texture || element);
     }
 }
 
@@ -834,17 +888,13 @@ function processAtlasGenerationQueue(): void {
                 }
 
                 const imageTexture = gl.createTexture()
-                gl.activeTexture(gl.TEXTURE0);
+                gl.activeTexture(gl.TEXTURE0 + j);
                 gl.bindTexture(gl.TEXTURE_2D, imageTexture);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
-
-                gl.activeTexture(gl.TEXTURE0 + j);
-                gl.bindTexture(gl.TEXTURE_2D, imageTexture);
-                
             }
 
             gl.bindBuffer(gl.ARRAY_BUFFER, atlasQuadsDestUVs);
@@ -861,7 +911,23 @@ function processAtlasGenerationQueue(): void {
     console.timeEnd('atlas processing')
 }
 
-function debugOutputAtlas(atlas: Atlas, width: number, height: number): void {
+function downloadBase64File(contentBase64, fileName) {
+    const linkSource = contentBase64;
+    const downloadLink = document.createElement('a');
+    document.body.appendChild(downloadLink);
+
+    downloadLink.href = linkSource;
+    downloadLink.target = '_self';
+    downloadLink.download = fileName;
+    downloadLink.click();
+
+    document.body.removeChild(downloadLink);
+}
+
+function debugOutputAtlas(atlas: Atlas): void {
+    const width = ATLAS_SIZE
+    const height = ATLAS_SIZE
+
     gl.bindFramebuffer(gl.FRAMEBUFFER, atlas.frameBuffer);
     const canvas = document.createElement('canvas')
     canvas.width = width
@@ -871,7 +937,24 @@ function debugOutputAtlas(atlas: Atlas, width: number, height: number): void {
     gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, imageData.data);
     context.putImageData(imageData, 0, 0)
     const str = canvas.toDataURL('image/jpeg', 0.1)
-    console.log(str)
+    downloadBase64File(str, 'atlas.jpeg')
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}
+
+function debugOutputAtlasPng(atlas: Atlas): void {
+    const width = ATLAS_SIZE
+    const height = ATLAS_SIZE
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, atlas.frameBuffer);
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    const context = canvas.getContext('2d')
+    const imageData = context.createImageData(width, height)
+    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, imageData.data);
+    context.putImageData(imageData, 0, 0)
+    const str = canvas.toDataURL('image/png')
+    downloadBase64File(str, 'atlas.png')
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 }
 
