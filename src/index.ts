@@ -133,6 +133,11 @@ function setupCanvas() {
 
     canvas.style.width = screenWidth + "px";
     canvas.style.height = screenHeight + "px";
+
+    canvas.onmousedown = controls_mousedown;
+    canvas.onmouseup = controls_mouseup;
+    canvas.onmousemove = controls_mousemove;
+    canvas.onwheel = controls_wheel;
 }
 
 function setupWebGL() {
@@ -358,7 +363,7 @@ async function getElementsPositionsWithoutIntersections(elements) {
             (canvas.width / 2 + x) * toBox2D, 
             (canvas.height / 2 + y) * toBox2D);
 
-        dist += 50000 / dist
+        dist += 5000 / dist
 
         bd.set_position(init_pos);
         bd.set_linearDamping(0.01);
@@ -382,17 +387,19 @@ async function getElementsPositionsWithoutIntersections(elements) {
 
     console.time('calc positions')
 
+    /*
     for (let i = 0; i < 100; i++) {
         world.Step(1, 5, 50);
     }
+    */
 
     for (const position of positions) {
         const pos = position.body.GetPosition();
         position.x = pos.get_x() * fromBox2D - position.width / 2
         position.y = pos.get_y() * fromBox2D - position.height / 2
 
-        position.x = (position.x - canvas.width / 2) * 0.5 + canvas.width / 2
-        position.y = (position.y - canvas.height / 2) * 0.5 + canvas.height / 2
+        // position.x = (position.x - canvas.width / 2) * 0.5 + canvas.width / 2
+        // position.y = (position.y - canvas.height / 2) * 0.5 + canvas.height / 2
     }
 
     console.timeEnd('calc positions')
@@ -543,7 +550,7 @@ function outputMemory() {
         memory += buffer.atlases.length * (ATLAS_SIZE * ATLAS_SIZE * 4)
     }
 
-    const wastedPercent = Math.round((1 - (debugTextureWithoutAtlasesMemoryCount / memory)) * 100);
+    const wastedPercent = memory > 0 ? Math.round((1 - (debugTextureWithoutAtlasesMemoryCount / memory)) * 100) : 0;
     const atlasMB = Math.round(memory / (1024 * 1024))
 
     fpsElement.textContent = `${atlasMB} MB fot Atlases, ${wastedPercent}% wasted`;
@@ -757,7 +764,6 @@ function draw(timestamp) {
     // filling render target with our blank color
     gl.clear(gl.COLOR_BUFFER_BIT);
 
-    scale *= 0.999;
     updateCamera();
 
     for (const buffer of buffers) {
@@ -1238,4 +1244,79 @@ function create3DContextWithWrapperThatThrowsOnGLError(context: WebGLRenderingCo
         return context.getError();
     };
     return wrap as WebGLRenderingContext;
+}
+
+// controls
+
+let isDown = false;
+let lastX = 0
+let lastY = 0
+
+function controls_mousedown(e) {
+    if (e.button === 0) {
+        isDown = true
+    }
+    lastX = e.clientX;
+    lastY = e.clientY;
+}
+function controls_mouseup(e) {
+    if (e.button === 0) {
+        isDown = false
+    }
+    lastX = e.clientX;
+    lastY = e.clientY;
+}
+
+function moveCameraBy(dx, dy) {
+    cameraX -= dx / scale * devicePixelRatio;
+    cameraY -= dy / scale * devicePixelRatio;
+}
+
+function screenToWorld(x, y) {
+    return [
+        x / scale - cameraX,
+        y / scale - cameraY
+    ]
+}
+
+function scaleCameraBy(s) {
+    const screenX = lastX * window.devicePixelRatio - canvas.width / 2;
+    const screenY = lastY * window.devicePixelRatio - canvas.height / 2;
+
+    const [ x0, y0 ] = screenToWorld(screenX, screenY);
+    
+    scale = Math.max(0.01, Math.min(100, scale / (1 + Math.min(Math.max(-0.999, s / 100), 0.999))));
+
+    const [ x1, y1 ] = screenToWorld(screenX, screenY);
+
+    const dx = x1 - x0
+    const dy = y1 - y0
+
+    cameraX -= dx;
+    cameraY -= dy;
+}
+
+function controls_mousemove(e) {
+    const x = e.clientX;
+    const y = e.clientY;
+    if (isDown) {
+        const dx = x - lastX;
+        const dy = y - lastY;
+
+        moveCameraBy(dx, dy)
+    }
+    lastX = x;
+    lastY = y;
+}
+
+function controls_wheel(e) {
+    const isTouchPad = e.wheelDeltaY ? e.wheelDeltaY === -3 * e.deltaY : e.deltaMode === 0
+
+    if (isTouchPad) {
+        moveCameraBy(e.deltaX, e.deltaY)
+    } else {
+        scaleCameraBy(e.deltaY)
+    }
+    
+    e.preventDefault()
 }
