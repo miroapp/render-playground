@@ -332,6 +332,32 @@ function loadImage(url) {
     })
 }
 
+function getElementsPositionsWithoutIntersections(elements) {
+    const positions = []
+
+    let dist = 50;
+    for (const element of elements) {
+        const angle = dist / 25
+        const s = Math.sin(angle)
+        const c = Math.cos(angle)
+
+        const x = s * dist;
+        const y = c * dist;
+
+        positions.push({
+            x: canvas.width / 2 + x, 
+            y: canvas.height / 2 + y,
+            width: element.width,
+            height: element.height,
+        });
+
+        dist += 5000 / dist
+    }
+
+    return positions;
+}
+
+/*
 async function getElementsPositionsWithoutIntersections(elements) {
     const Box2DStartup = (window as any).Box2D
     const Box2D = await Box2DStartup()
@@ -387,25 +413,23 @@ async function getElementsPositionsWithoutIntersections(elements) {
 
     console.time('calc positions')
 
-    /*
     for (let i = 0; i < 100; i++) {
         world.Step(1, 5, 50);
     }
-    */
 
     for (const position of positions) {
         const pos = position.body.GetPosition();
         position.x = pos.get_x() * fromBox2D - position.width / 2
         position.y = pos.get_y() * fromBox2D - position.height / 2
-
-        // position.x = (position.x - canvas.width / 2) * 0.5 + canvas.width / 2
-        // position.y = (position.y - canvas.height / 2) * 0.5 + canvas.height / 2
     }
 
     console.timeEnd('calc positions')
 
     return positions;
 }
+*/
+
+
 
 function getTextSizeInPixels(text: string, font: string) {
     textContext.font = font;
@@ -501,7 +525,7 @@ async function fillBuffer() {
     console.time('text rendering')
 
     const texts = []
-    for (let i = 0; i < 3000; i++) {
+    for (let i = 0; i < 0; i++) {
         const font = `${Math.round(randomRange(8, 128))}px Arial`
         const text = generateRandomText()
         const size = getTextSizeInPixels(text, font);
@@ -515,18 +539,21 @@ async function fillBuffer() {
     console.timeEnd('text rendering')
 
     const promises = []
-    for (let i = 1; i <= 1000; i++) {
-        promises.push(loadImage(`/images/${i}.jpg`))
+    for (let i = 1; i <= 0; i++) {
+        promises.push(loadImage(`images/${i}.jpg`))
     }
     const images = await Promise.all(promises)
 
     const combination = [].concat(texts, images, shapes, lines);
-    const randomCombination = []
-    for (const element of combination) {
-        randomCombination.splice(Math.round(randomRange(0, randomCombination.length - 1)), 0, element);
+    for (let i = combination.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const temp = combination[i];
+        combination[i] = combination[j];
+        combination[j] = temp;
     }
+    const randomCombination = combination;
 
-    const positions = await getElementsPositionsWithoutIntersections(randomCombination)
+    const positions = getElementsPositionsWithoutIntersections(randomCombination)
 
     for (let i = 0; i < randomCombination.length; i++) {
         const element = randomCombination[i]
@@ -544,7 +571,7 @@ async function fillBuffer() {
     }
 }
 
-function outputMemory() {
+function outputMemoryAndFPS(timestamp) {
     let memory = 0;
     for (const buffer of buffers) {
         memory += buffer.atlases.length * (ATLAS_SIZE * ATLAS_SIZE * 4)
@@ -553,7 +580,10 @@ function outputMemory() {
     const wastedPercent = memory > 0 ? Math.round((1 - (debugTextureWithoutAtlasesMemoryCount / memory)) * 100) : 0;
     const atlasMB = Math.round(memory / (1024 * 1024))
 
-    fpsElement.textContent = `${atlasMB} MB fot Atlases, ${wastedPercent}% wasted`;
+    const fps = Math.round(1000 / (timestamp - lastFrameTimestamp))
+    lastFrameTimestamp = timestamp;
+
+    fpsElement.textContent = `${atlasMB} MB fot Atlases, ${wastedPercent}% wasted, FPS: ${fps}`;
 }
 
 function updateCamera() {
@@ -757,7 +787,9 @@ function addShape(points: number[], x: number, y: number, r: number, g: number, 
 }
 
 function draw(timestamp) {
-    outputMemory()
+    scale *= .999;
+
+    outputMemoryAndFPS(timestamp)
 
     processAtlasGenerationQueue()
 
