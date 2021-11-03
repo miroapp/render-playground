@@ -357,80 +357,6 @@ function getElementsPositionsWithoutIntersections(elements) {
     return positions;
 }
 
-/*
-async function getElementsPositionsWithoutIntersections(elements) {
-    const Box2DStartup = (window as any).Box2D
-    const Box2D = await Box2DStartup()
-    const gravity = new Box2D.b2Vec2(0.0, 0.0);
-    const world = new Box2D.b2World(gravity);
-    world.SetContinuousPhysics(false)
-
-    const positions = []
-
-    const toBox2D = 1 / 10;
-    const fromBox2D = 1 / toBox2D
-
-    let dist = 50;
-    for (const element of elements) {
-        const shape = new Box2D.b2PolygonShape();
-        shape.SetAsBox(element.width / 2 * toBox2D, element.height / 2 * toBox2D);
-
-        const bd = new Box2D.b2BodyDef();
-        bd.set_type(Box2D.b2_dynamicBody);
-
-        const angle = dist / 25
-        const s = Math.sin(angle)
-        const c = Math.cos(angle)
-
-        const x = s * dist;
-        const y = c * dist;
-
-        const init_pos = new Box2D.b2Vec2(
-            (canvas.width / 2 + x) * toBox2D, 
-            (canvas.height / 2 + y) * toBox2D);
-
-        dist += 5000 / dist
-
-        bd.set_position(init_pos);
-        bd.set_linearDamping(0.01);
-        const body = world.CreateBody(bd);
-        body.CreateFixture(shape, 5.0);
-        body.SetFixedRotation(true);
-        body.SetAwake(true)
-        const init_velocity = new Box2D.b2Vec2(
-            randomRange(-10, 10) * toBox2D, 
-            randomRange(-10, 10) * toBox2D);
-        body.SetLinearVelocity(init_velocity)
-
-        positions.push({
-            x: undefined,
-            y: undefined,
-            width: element.width,
-            height: element.height,
-            body
-        })
-    }
-
-    console.time('calc positions')
-
-    for (let i = 0; i < 100; i++) {
-        world.Step(1, 5, 50);
-    }
-
-    for (const position of positions) {
-        const pos = position.body.GetPosition();
-        position.x = pos.get_x() * fromBox2D - position.width / 2
-        position.y = pos.get_y() * fromBox2D - position.height / 2
-    }
-
-    console.timeEnd('calc positions')
-
-    return positions;
-}
-*/
-
-
-
 function getTextSizeInPixels(text: string, font: string) {
     textContext.font = font;
     const measures = textContext.measureText(text)
@@ -525,7 +451,7 @@ async function fillBuffer() {
     console.time('text rendering')
 
     const texts = []
-    for (let i = 0; i < 0; i++) {
+    for (let i = 0; i < 1000; i++) {
         const font = `${Math.round(randomRange(8, 128))}px Arial`
         const text = generateRandomText()
         const size = getTextSizeInPixels(text, font);
@@ -539,7 +465,7 @@ async function fillBuffer() {
     console.timeEnd('text rendering')
 
     const promises = []
-    for (let i = 1; i <= 0; i++) {
+    for (let i = 1; i <= 1000; i++) {
         promises.push(loadImage(`images/${i}.jpg`))
     }
     const images = await Promise.all(promises)
