@@ -1,0 +1,14 @@
+# Ignore folders
+.idea
+.cache
+.parcel-cache
+
+lib
+dist
+node_modules
+
+# Ignore files
+**/*.DS_Store
+**/*.tgz
+
+/npm-debug.log

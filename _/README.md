@@ -24,4 +24,4 @@ yarn start
 
 ## Tech. Stack
 
-- Next.js
+- Bundler: Parcel JS
