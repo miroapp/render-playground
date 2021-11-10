@@ -1,11 +1,14 @@
 import type { NextPage } from "next";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import styles from "../styles/ShapesPage.module.css";
 import vertexShader from "../experiments/shapes/shaders/ellipse-vertex.glsl";
 import fragmentShader from "../experiments/shapes/shaders/ellipse-fragment.glsl";
+import { clear, createProgram, draw, setIndices, setVertexAttribute } from "../modules/webgl-utils";
 
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 800;
+const RECT_VERTICES = [0, 0, 1, 0, 0, 1, 1, 1];
+const RECT_INDICES = [0, 1, 2, 3, 2, 1];
 
 function experiment1(canvas: HTMLCanvasElement) {
   const gl = canvas.getContext("webgl");
@@ -14,16 +17,6 @@ function experiment1(canvas: HTMLCanvasElement) {
 
   canvas.width = CANVAS_WIDTH;
   canvas.height = CANVAS_HEIGHT;
-
-  // prettier-ignore
-  const vertices = [
-    0.0, 0.0,
-    1.0, 0.0,
-    0.0, 1.0,
-    1.0, 1.0,
-  ]
-
-  const indices = [0, 1, 2, 1, 2, 3];
 
   const positionData: number[] = [];
   const scaleData: number[] = [];
@@ -45,10 +38,10 @@ function experiment1(canvas: HTMLCanvasElement) {
     fillColor: [number, number, number, number];
   }) {
     // Push the bounding box vertices to the position buffer
-    positionData.push(...vertices);
+    positionData.push(...RECT_VERTICES);
 
-    // Push the indices. Offset by n. of vertices at every new ellipse
-    indexData.push(...indices.map((index) => 4 * nEllipses + index));
+    // Push the indices, with an offset by n. of vertices at every new ellipse
+    indexData.push(...RECT_INDICES.map((index) => 4 * nEllipses + index));
 
     // Push 4 identical copies of the attributes, one for every vertex
     for (let i = 0; i < 4; i++) {
@@ -91,93 +84,20 @@ function experiment1(canvas: HTMLCanvasElement) {
     fillColor: [0.0, 0.75, 0.0, 0.7],
   });
 
-  gl.enable(gl.BLEND);
-  gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-  gl.enable(gl.DEPTH_TEST);
-
-  // Create vertex shader
-  const vs = gl.createShader(gl.VERTEX_SHADER)!;
-  gl.shaderSource(vs, vertexShader);
-  gl.compileShader(vs);
-
-  // Create fragment shader
-  const fs = gl.createShader(gl.FRAGMENT_SHADER)!;
-  gl.shaderSource(fs, fragmentShader);
-  gl.compileShader(fs);
-
-  // Link
-  const program = gl.createProgram()!;
-  gl.attachShader(program, fs);
-  gl.attachShader(program, vs);
-  gl.linkProgram(program);
-  gl.useProgram(program);
+  const program = createProgram(gl, vertexShader, fragmentShader);
 
   // Create buffers
-  const positionBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positionData), gl.STATIC_DRAW);
+  setVertexAttribute(gl, program, "position", 2, positionData);
+  setVertexAttribute(gl, program, "scale", 2, scaleData);
+  setVertexAttribute(gl, program, "translate", 2, translateData);
+  setVertexAttribute(gl, program, "depth", 1, depthData);
+  setVertexAttribute(gl, program, "strokeWidth", 1, strokeWidthData);
+  setVertexAttribute(gl, program, "strokeColor", 4, strokeColorData);
+  setVertexAttribute(gl, program, "fillColor", 4, fillColorData);
+  setIndices(gl, indexData);
 
-  const positionLocation = gl.getAttribLocation(program, "position");
-  gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, true, 0, 0);
-  gl.enableVertexAttribArray(positionLocation);
-
-  const scaleBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, scaleBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(scaleData), gl.STATIC_DRAW);
-
-  const scaleLocation = gl.getAttribLocation(program, "scale");
-  gl.vertexAttribPointer(scaleLocation, 2, gl.FLOAT, false, 0, 0);
-  gl.enableVertexAttribArray(scaleLocation);
-
-  const translateBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, translateBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(translateData), gl.STATIC_DRAW);
-
-  const translateLocation = gl.getAttribLocation(program, "translate");
-  gl.vertexAttribPointer(translateLocation, 2, gl.FLOAT, false, 0, 0);
-  gl.enableVertexAttribArray(translateLocation);
-
-  const depthBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, depthBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(depthData), gl.STATIC_DRAW);
-
-  const depthLocation = gl.getAttribLocation(program, "depth");
-  gl.vertexAttribPointer(depthLocation, 1, gl.FLOAT, false, 0, 0);
-  gl.enableVertexAttribArray(depthLocation);
-
-  const strokeWidthBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, strokeWidthBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(strokeWidthData), gl.STATIC_DRAW);
-
-  const strokeWidthLocation = gl.getAttribLocation(program, "strokeWidth");
-  gl.vertexAttribPointer(strokeWidthLocation, 1, gl.FLOAT, false, 0, 0);
-  gl.enableVertexAttribArray(strokeWidthLocation);
-
-  const strokeColorBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, strokeColorBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(strokeColorData), gl.STATIC_DRAW);
-
-  const strokeColorLocation = gl.getAttribLocation(program, "strokeColor");
-  gl.vertexAttribPointer(strokeColorLocation, 4, gl.FLOAT, false, 0, 0);
-  gl.enableVertexAttribArray(strokeColorLocation);
-
-  const fillColorBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, fillColorBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(fillColorData), gl.STATIC_DRAW);
-
-  const fillColorLocation = gl.getAttribLocation(program, "fillColor");
-  gl.vertexAttribPointer(fillColorLocation, 4, gl.FLOAT, false, 0, 0);
-  gl.enableVertexAttribArray(fillColorLocation);
-
-  const indexBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indexData), gl.STATIC_DRAW);
-
-  gl.clearColor(0.0, 0.0, 0.0, 0.0);
-  gl.clear(gl.COLOR_BUFFER_BIT);
-  gl.viewport(0, 0, canvas.width, canvas.height);
-
-  gl.drawElements(gl.TRIANGLES, indexData.length, gl.UNSIGNED_SHORT, 0);
+  clear(gl);
+  draw(gl, canvas, indexData.length);
 }
 
 const ShapesPage: NextPage = () => {
