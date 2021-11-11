@@ -23,6 +23,13 @@ const Home: NextPage = () => {
             <p>Experiment with blending modes.</p>
           </a>
         </div>
+
+        <div className={styles.grid}>
+          <a href="/shapes" className={styles.card}>
+            <h2>Shapes &rarr;</h2>
+            <p>Experiment with shapes.</p>
+          </a>
+        </div>
       </main>
     </div>
   );
