@@ -1,8 +1,8 @@
 import type { NextPage } from "next";
 import { useCallback, useEffect, useRef, useState } from "react";
-import styles from "../styles/BlendingModesPage.module.css";
-import vertexShader from "../experiments/blending-modes/shaders/vertex-shader.glsl";
-import fragmentShader from "../experiments/blending-modes/shaders/fragment-shader.glsl";
+import styles from "./blending_page_style.module.css";
+import vertexShader from "./shaders/vertex-shader.glsl";
+import fragmentShader from "./shaders/fragment-shader.glsl";
 
 const CANVAS_WIDTH = 200;
 const CANVAS_HEIGHT = 200;
@@ -244,7 +244,6 @@ function experiment4(
   fillRect(gl, program, [-0.25, -0.25, -0.2, 0], options.colors[2]);
 }
 
-
 const BlendingModesPage: NextPage = () => {
   const canvas1 = useRef<HTMLCanvasElement>(null);
   const canvas2 = useRef<HTMLCanvasElement>(null);
@@ -258,7 +257,7 @@ const BlendingModesPage: NextPage = () => {
   const [premultipliedAlpha, setPremultipliedAlpha] = useState(true);
   const [blend, setBlend] = useState(true);
   const [depthTest, setDepthTest] = useState(false);
-  const resetKey = `${premultipliedAlpha}|${blend}|${depthTest}`
+  const resetKey = `${premultipliedAlpha}|${blend}|${depthTest}`;
 
   const handlePremultipliedAlphaClick = useCallback(() => {
     setPremultipliedAlpha(!premultipliedAlpha);
@@ -324,15 +323,15 @@ const BlendingModesPage: NextPage = () => {
         blend,
         depthTest,
         colors: [
-          [0, 0, 1, .8],
+          [0, 0, 1, 0.8],
           [1, 0, 0, 0.5],
           [0, 1, 0, 0.5],
-          [1, 0, 0, 1]
+          [1, 0, 0, 1],
         ],
       });
     }
     if (canvas7.current) {
-      experiment3(canvas7.current, ["#0000FFff", "#FF000080", "#00FF0080", "#ff0000ff"])
+      experiment3(canvas7.current, ["#0000FFff", "#FF000080", "#00FF0080", "#ff0000ff"]);
     }
   }, [premultipliedAlpha, blend, depthTest]);
 
@@ -365,19 +364,11 @@ const BlendingModesPage: NextPage = () => {
             Premultiplied Alpha
           </label>
           <label className={styles.option}>
-            <input
-              type="checkbox"
-              onClick={handleBlendClick}
-              defaultChecked={blend}
-            />
+            <input type="checkbox" onClick={handleBlendClick} defaultChecked={blend} />
             Blend
           </label>
           <label className={styles.option}>
-            <input
-              type="checkbox"
-              onClick={handleDepthTestClick}
-              defaultChecked={depthTest}
-            />
+            <input type="checkbox" onClick={handleDepthTestClick} defaultChecked={depthTest} />
             Depth Test
           </label>
         </div>
@@ -393,7 +384,6 @@ const BlendingModesPage: NextPage = () => {
         <div className={styles.card}>
           <canvas key={`canvas-8-${resetKey}`} ref={canvas8} className={styles.canvas} />
         </div>
-      
       </div>
     </div>
   );

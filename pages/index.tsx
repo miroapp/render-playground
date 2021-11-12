@@ -13,8 +13,8 @@ const Home: NextPage = () => {
         <h1 className={styles.title}>Playground</h1>
 
         <p className={styles.description}>
-          Playground for Computer Graphics experiments and benchmarking using
-          GPU acceleration APIs (WebGL / WebGPU / etc.)
+          Playground for Computer Graphics experiments and benchmarking using GPU acceleration APIs
+          (WebGL / WebGPU / etc.)
         </p>
 
         <div className={styles.grid}>
@@ -28,6 +28,13 @@ const Home: NextPage = () => {
           <a href="/shapes" className={styles.card}>
             <h2>Shapes &rarr;</h2>
             <p>Experiment with shapes.</p>
+          </a>
+        </div>
+
+        <div className={styles.grid}>
+          <a href="/points" className={styles.card}>
+            <h2>Points &rarr;</h2>
+            <p>Experiment with points.</p>
           </a>
         </div>
       </main>
