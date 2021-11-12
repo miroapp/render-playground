@@ -10,7 +10,7 @@ import { mat4, vec3 } from "gl-matrix";
 
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 640;
-const NUM_POINTS = 10000000;
+const NUM_POINTS = 17000000;
 
 function experiment(
   canvas: HTMLCanvasElement,
@@ -71,18 +71,16 @@ function experiment(
   vec3.set(position, 0.0, 0.0, 0.0);
 
   let angle = 0.0;
-  let frameId = 0;
 
-  function draw(now: number) {
+  function draw() {
     gl!.viewport(0, 0, canvas.width, canvas.height);
-    gl!.clear(gl!.COLOR_BUFFER_BIT);
     mat4.perspective(pMatrix, Math.PI * 0.35, canvas.width / canvas.height, 0.01, 1000.0);
     angle += 0.0005;
     // P * V * M
     // mat4.translate(mvpMatrix, mvpMatrix, position);
     // mat4.identity(mMatrix)
 
-    position[2] = Math.sin(now / 50000);
+    position[2] = Math.sin(performance.now() / 50000);
 
     mat4.identity(vMatrix);
     mat4.translate(vMatrix, vMatrix, position);
@@ -97,9 +95,9 @@ function experiment(
 
     gl!.uniformMatrix4fv(u_projection, false, mvpMatrix);
     gl!.drawArrays(gl!.POINTS, 0, pointsCount);
-    frameId = window.requestAnimationFrame(draw);
+    window.requestAnimationFrame(draw);
   }
-  frameId = window.requestAnimationFrame(draw);
+  window.requestAnimationFrame(draw);
 }
 
 const PointsSprite: NextPage = () => {
