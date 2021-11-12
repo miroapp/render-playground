@@ -24,16 +24,14 @@ function experiment(
   canvas.width = CANVAS_WIDTH;
   canvas.height = CANVAS_HEIGHT;
 
-  const positionData: number[] = [];
-  for (let index = 0; index < NUM_POINTS; index++) {
-    positionData.push(
-      // x
-      (Math.random() - 0.5) * 8,
-      // y
-      (Math.random() - 0.5) * 8,
-      // z
-      (Math.random() - 0.5) * 8
-    );
+  const positionData: Array<number> = new Array<number>(NUM_POINTS * 3);
+  for (let pointInd = 0, dimension = 0; pointInd < NUM_POINTS; pointInd++, dimension = 0) {
+    // x
+    positionData[pointInd + dimension++] = (Math.random() - 0.5) * 8 + Math.random() * 2;
+    // y
+    positionData[pointInd + dimension++] = (Math.random() - 0.5) * 8;
+    // z
+    positionData[pointInd + dimension++] = (Math.random() - 0.5) * 8;
   }
 
   const program = createProgram(gl, vertexShader, fragmentShader);
@@ -44,20 +42,7 @@ function experiment(
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, icon);
   gl.generateMipmap(gl.TEXTURE_2D);
 
-  const buffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positionData), gl.STATIC_DRAW);
-
-  // gl.clearColor(0.0, 0.0, 0.0, 0.0);
-  gl.clear(gl.COLOR_BUFFER_BIT);
-
-  gl.enable(gl.BLEND);
-  // gl.disable(gl.DEPTH_TEST);
-  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-
-  // Create buffers
   setVertexAttribute(gl, program, "a_position", 3, positionData);
-
   const pMatrix = mat4.create();
   const vMatrix = mat4.create();
   const ivMatrix = mat4.create();
@@ -71,6 +56,13 @@ function experiment(
   vec3.set(position, 0.0, 0.0, 0.0);
 
   let angle = 0.0;
+
+  // gl.clearColor(0.0, 0.0, 0.0, 0.0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+
+  gl.enable(gl.BLEND);
+  // gl.disable(gl.DEPTH_TEST);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
   function draw() {
     gl!.viewport(0, 0, canvas.width, canvas.height);
