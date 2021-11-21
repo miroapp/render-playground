@@ -1,12 +1,18 @@
 import type { NextPage } from "next";
 import { useEffect, useRef } from "react";
-import styles from "../styles/ShapesPage.module.css";
-import vertexShader from "../experiments/shapes/shaders/ellipse-vertex.glsl";
-import fragmentShader from "../experiments/shapes/shaders/ellipse-fragment.glsl";
-import { clear, createProgram, draw, setIndices, setVertexAttribute } from "../modules/webgl-utils";
+import styles from "./shapes_page_style.module.css";
+import vertexShader from "./shaders/ellipse-vertex.glsl";
+import fragmentShader from "./shaders/ellipse-fragment.glsl";
+import {
+  clear,
+  createProgram,
+  draw,
+  setIndices,
+  setVertexAttribute,
+} from "../../modules/webgl-utils";
 
 const CANVAS_WIDTH = 800;
-const CANVAS_HEIGHT = 800;
+const CANVAS_HEIGHT = 640;
 const RECT_VERTICES = [0, 0, 1, 0, 0, 1, 1, 1];
 const RECT_INDICES = [0, 1, 2, 3, 2, 1];
 
