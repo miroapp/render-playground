@@ -45,7 +45,6 @@ export class TilesRenderer {
 
     this.context.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     widgets.forEach((widget) => {
-      console.log(widget.position.x, box.x);
       this.context.drawImage(
         widget.image,
         (widget.position.x - box.x) * params.scale,

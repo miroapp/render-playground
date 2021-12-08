@@ -34,7 +34,6 @@ export class WidgetManager {
   }
 
   private createWidgets(box: BoundaryBox) {
-    console.log("Creating new widgets");
     const x0 = Math.min(this.worldBox.x, box.x);
     const y0 = Math.min(this.worldBox.y, box.y);
     const x1 = Math.max(this.worldBox.x + this.worldBox.width, box.x + box.width);
@@ -52,7 +51,6 @@ export class WidgetManager {
       let y = newWorldBox.y;
       while (y < newWorldBox.y + newWorldBox.height) {
         if (!isWithin({ x, y }, this.worldBox)) {
-          console.log("New widget created at", x, y);
           const assetIndex = Math.floor(Math.random() * this.assets.length);
           const asset = this.assets[assetIndex];
           this.widgets.push(new Widget(asset, { x, y }));
