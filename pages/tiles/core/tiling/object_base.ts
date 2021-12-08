@@ -1,4 +1,4 @@
-import { BoundaryBox } from "./types";
+import { BoundaryBox } from "../types";
 
 abstract class ObjectBase {
     abstract getBoundary(): BoundaryBox

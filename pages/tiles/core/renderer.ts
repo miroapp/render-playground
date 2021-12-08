@@ -1,10 +1,11 @@
+import { ViewportUpdateCallback } from "./types";
+
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 640;
 
 interface RendererProps {
     canvas: HTMLCanvasElement
 }
-
 export class TilesRenderer {
     private container: HTMLCanvasElement
     private context: CanvasRenderingContext2D
@@ -30,6 +31,10 @@ export class TilesRenderer {
 
     refresh() {
 
+    }
+
+    onViewportUpdate(callback: ViewportUpdateCallback) {
+        
     }
 
     destroy() {
