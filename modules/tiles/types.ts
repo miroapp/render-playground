@@ -18,7 +18,6 @@ export interface VisualUpdateParams {
   /**
    * Width and Height of the canvas
    */
-  size: ISize;
   /**
    * Zoom level of the canvas
    */

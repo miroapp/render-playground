@@ -12,7 +12,6 @@ function experiment(renderer: TilesRenderer) {
     const scaleSquared = 1 + Math.cos(scaleStep) * 0.8;
     renderer.render({
       canvasOffset: { x, y },
-      size: { width: 0, height: 0 },
       scale: scaleSquared * scaleSquared,
     });
     window.requestAnimationFrame(() => animate(x + 1, y + 1, scaleStep + 0.005));
