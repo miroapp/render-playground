@@ -6,7 +6,7 @@ const AVG_DISTANCE = 200;
 export class WidgetManager {
   private worldBox: BoundaryBox = { x: 0, y: 0, width: 0, height: 0 };
   private assets: HTMLImageElement[] = [];
-  private widgets: Widget[] = [];
+  widgets: Widget[] = [];
 
   constructor() {
     for (let i = 1; i < 67; i++) {
@@ -20,7 +20,12 @@ export class WidgetManager {
     const result: Widget[] = [];
 
     if (!contains(this.worldBox, box)) {
-      this.createWidgets(box);
+      this.createWidgets({
+        x: box.x - box.width,
+        y: box.y - box.height,
+        width: 3 * box.width,
+        height: 3 * box.height,
+      });
     }
 
     this.widgets.forEach((widget) => {

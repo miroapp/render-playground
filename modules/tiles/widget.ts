@@ -7,8 +7,9 @@ export class Widget {
     return {
       x: this.position.x,
       y: this.position.y,
-      width: this.image.width,
-      height: this.image.height,
+      // Images are stored at 4x resolution
+      width: this.image.width / 4,
+      height: this.image.height / 4,
     };
   }
 }

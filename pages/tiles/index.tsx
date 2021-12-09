@@ -8,13 +8,17 @@ import { WidgetManager } from "../../modules/tiles/widget-manager";
 import styles from "./tiles_page_style.module.css";
 
 function experiment(renderer: TilesRenderer) {
-  setTimeout(() => {
+  function animate(x: number, y: number, scaleStep: number) {
+    const scaleSquared = 1 + Math.cos(scaleStep) * 0.8;
     renderer.render({
-      canvasOffset: { x: 400, y: -100 },
+      canvasOffset: { x, y },
       size: { width: 0, height: 0 },
-      scale: 0.75,
+      scale: scaleSquared * scaleSquared,
     });
-  }, 1000);
+    window.requestAnimationFrame(() => animate(x + 1, y + 1, scaleStep + 0.005));
+  }
+
+  setTimeout(() => animate(0, 0, 0), 1000);
 }
 
 const TilesAPI: NextPage = () => {

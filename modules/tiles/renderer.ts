@@ -49,10 +49,13 @@ export class TilesRenderer {
         widget.image,
         (widget.position.x - box.x) * params.scale,
         (widget.position.y - box.y) * params.scale,
-        widget.image.width * 0.25 * params.scale,
-        widget.image.height * 0.25 * params.scale
+        // Images are stored at 4x resolution
+        (widget.image.width * params.scale) / 4,
+        (widget.image.height * params.scale) / 4
       );
     });
+    this.context.fillStyle = "#000000";
+    this.context.fillText(`${widgets.length}/${this.widgetManager.widgets.length}`, 0, 20);
   }
 
   refresh() {}

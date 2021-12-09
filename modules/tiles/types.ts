@@ -48,10 +48,7 @@ export function intersects(a: BoundaryBox, b: BoundaryBox) {
   const bx1 = b.x + b.width;
   const by1 = b.y + b.height;
 
-  return (
-    ((bx0 > ax0 && bx0 < ax1) || (bx1 > ax0 && bx1 < ax1)) &&
-    ((by0 > ay0 && by0 < ay1) || (by1 > ay0 && by1 < ay1))
-  );
+  return bx1 > ax0 && bx0 < ax1 && by1 > ay0 && by0 < ay1;
 }
 
 export function contains(a: BoundaryBox, b: BoundaryBox) {
@@ -64,14 +61,5 @@ export function contains(a: BoundaryBox, b: BoundaryBox) {
   const bx1 = b.x + b.width;
   const by1 = b.y + b.height;
 
-  return (
-    bx0 > ax0 &&
-    bx0 < ax1 &&
-    bx1 > ax0 &&
-    bx1 < ax1 &&
-    by0 > ay0 &&
-    by0 < ay1 &&
-    by1 > ay0 &&
-    by1 < ay1
-  );
+  return bx0 > ax0 && bx1 < ax1 && by0 > ay0 && by1 < ay1;
 }
