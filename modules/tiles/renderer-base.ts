@@ -1,16 +1,16 @@
-import { IPoint, ViewportUpdateCallback, VisualUpdateParams } from "./types";
-import { WidgetManager } from "./widget-manager";
 import { NavigationManager } from "./navigation-manager";
+import { BoundaryBox, IPoint, ViewportUpdateCallback, VisualUpdateParams } from "./types";
+import { WidgetManager } from "./widget-manager";
 
 const CANVAS_WIDTH = 1280;
 const CANVAS_HEIGHT = 800;
 
-interface RendererProps {
+export interface RendererProps {
   canvas: HTMLCanvasElement;
   widgetManager: WidgetManager;
 }
 
-export class TilesRenderer {
+export abstract class RendererBase {
   /**
    * container location on HTML page (top-left)
    */
@@ -20,14 +20,13 @@ export class TilesRenderer {
    */
   private _lastMousePosition?: IPoint;
 
-  private _container: HTMLCanvasElement;
-  private _context: CanvasRenderingContext2D;
+  protected _container: HTMLCanvasElement;
+  protected _context: CanvasRenderingContext2D;
 
-  private widgetManager: WidgetManager;
+  protected widgetManager: WidgetManager;
   private navigationManager: NavigationManager;
 
   constructor({ canvas, widgetManager }: RendererProps) {
-    
     const ctx = canvas.getContext("2d");
 
     if (ctx === null) {
@@ -39,25 +38,30 @@ export class TilesRenderer {
 
     this._container = canvas;
     this._context = ctx;
-    
+
     this.widgetManager = widgetManager;
-    this.navigationManager = new NavigationManager(this)
+    this.navigationManager = new NavigationManager(this);
 
     this._container.addEventListener("pointerover", this.dispatchMouseOrWheelOverEvent);
     this._container.addEventListener("pointermove", this.dispatchMouseOrWheelOverEvent);
-    this._container.addEventListener("wheel", this.dispatchMouseOrWheelOverEvent, { capture: true });
+    this._container.addEventListener("wheel", this.dispatchMouseOrWheelOverEvent, {
+      capture: true,
+    });
     window.addEventListener("scroll", this.captureLocation.bind(this));
-    
+
     // initialize location of the canvas
     this.captureLocation();
+
+    // Start rendering loop
+    setTimeout(this.refresh.bind(this), 1000);
   }
 
   get container(): HTMLCanvasElement {
-    return this._container
+    return this._container;
   }
 
   get context(): CanvasRenderingContext2D {
-    return this._context
+    return this._context;
   }
 
   background(color: string) {
@@ -66,40 +70,25 @@ export class TilesRenderer {
     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   }
 
-  render(params: VisualUpdateParams) {
-    const width = CANVAS_WIDTH / params.scale;
-    const height = CANVAS_HEIGHT / params.scale;
-    const x = params.canvasOffset.x - width / 2;
-    const y = params.canvasOffset.y - height / 2;
-    const box = { x, y, width, height };
+  abstract render(params: VisualUpdateParams): void;
 
-    const widgets = this.widgetManager.getWidgets(box);
-
-    this._context.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    widgets.forEach((widget) => {
-      this._context.drawImage(
-        widget.image,
-        (widget.position.x - box.x) * params.scale,
-        (widget.position.y - box.y) * params.scale,
-        // Images are stored at 4x resolution
-        (widget.image.width * params.scale) / 4,
-        (widget.image.height * params.scale) / 4
-      );
-    });
-    this.context.fillStyle = "#000000";
-    this.context.fillText(`${widgets.length}/${this.widgetManager.widgets.length}`, 0, 20);
-  }
+  abstract reset(): void;
 
   refresh() {
-    // this._context.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    const needsRender = this.navigationManager.refresh()
+    const needsRender = this.navigationManager.refresh();
     if (needsRender) {
       this.render({
         canvasOffset: this.navigationManager.position,
-        scale: this.navigationManager.scale
-    })
+        scale: this.navigationManager.scale,
+      });
+    } else {
+      this.reset();
+      this.render({
+        canvasOffset: this.navigationManager.position,
+        scale: this.navigationManager.scale,
+      });
     }
-    requestAnimationFrame(this.refresh.bind(this))
+    requestAnimationFrame(this.refresh.bind(this));
   }
 
   onViewportUpdate(callback: ViewportUpdateCallback) {}
@@ -118,6 +107,29 @@ export class TilesRenderer {
 
   getMousePosition(): IPoint | undefined {
     return this._lastMousePosition;
+  }
+
+  protected drawContext(context: CanvasRenderingContext2D, box: BoundaryBox, scale: number) {
+    const widgets = this.widgetManager.getWidgets(box);
+    context.clearRect(0, 0, this._container.width, this._container.width);
+    widgets.forEach((widget) => {
+      context.drawImage(
+        widget.image,
+        (widget.position.x - box.x) * scale,
+        (widget.position.y - box.y) * scale,
+        // Images are stored at 4x resolution
+        (widget.image.width * scale) / 4,
+        (widget.image.height * scale) / 4
+      );
+    });
+  }
+
+  protected getVisualUpdateParamsBox(params: VisualUpdateParams) {
+    const width = this._container.width / params.scale;
+    const height = this._container.height / params.scale;
+    const x = params.canvasOffset.x - width / 2;
+    const y = params.canvasOffset.y - height / 2;
+    return { x, y, width, height };
   }
 
   private captureLocation(): void {

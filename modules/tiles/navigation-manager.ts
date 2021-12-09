@@ -1,4 +1,4 @@
-import type { TilesRenderer } from "./renderer";
+import type { RendererBase } from "./renderer-base";
 import { IPoint } from "./types";
 
 export class NavigationManager {
@@ -10,30 +10,40 @@ export class NavigationManager {
   public scale: number;
 
   private _deltaPan: IPoint = { x: 0, y: 0 };
+  private _prevScale: number;
 
-  constructor(readonly renderer: TilesRenderer) {
+  constructor(readonly renderer: RendererBase) {
     const canvas = this.renderer.container;
     this.position = { x: canvas.width * 0.5, y: canvas.height * 0.5 };
     this.scale = 1;
+    this._prevScale = 1;
 
     canvas.addEventListener("pointerdown", this._startNavigation, false);
     canvas.addEventListener("wheel", this.onMouseWheel, false);
   }
 
   refresh() {
-    const needsRender = this._isInvalid
+    const needsRender = this._isInvalid;
     if (this._isInvalid) {
       // update position of the camera
-      this.position.x = this.position.x + this._deltaPan.x
-      this.position.y = this.position.y + this._deltaPan.y
+      this.position.x = this.position.x + this._deltaPan.x;
+      this.position.y = this.position.y + this._deltaPan.y;
       this._deltaPan.x = 0;
-      this._deltaPan.y = 0
-      this._isInvalid = false
+      this._deltaPan.y = 0;
+      if (this._prevScale === this.scale) {
+        this._isInvalid = false;
+      } else {
+        this._prevScale = this.scale;
+      }
     }
-    return needsRender
+    return needsRender;
   }
 
-  zoomBy(delta: number, cursor?: IPoint) {}
+  zoomBy(delta: number, cursor?: IPoint): this {
+    this.scale = Math.min(Math.max(this.scale + delta * 0.01, 0.05), 4);
+    this._isInvalid = true;
+    return this;
+  }
 
   panBy(deltaX: number, deltaY: number): this {
     this._deltaPan.x = deltaX;
@@ -44,13 +54,14 @@ export class NavigationManager {
   }
 
   private onMouseWheel = (event: WheelEvent) => {
-    // event.preventDefault();
-    // const position = this.renderer.getMousePosition();
-    // this._navigationStartCursorPosition = { ...position };
+    event.preventDefault();
+    const position = this.renderer.getMousePosition();
+    this._navigationStartCursorPosition = { ...position };
     // const deltaYFactor = isMac ? -1 : -3;
-    // const delta =
-    //   event.deltaMode === 1 ? event.deltaY / deltaYFactor : event.deltaY / (deltaYFactor * 10);
-    // this.zoomBy(delta, this._navigationStartCursorPosition);
+    const deltaYFactor = -1;
+    const delta =
+      event.deltaMode === 1 ? event.deltaY / deltaYFactor : event.deltaY / (deltaYFactor * 10);
+    this.zoomBy(delta, this._navigationStartCursorPosition);
   };
 
   private _startNavigation = (event: PointerEvent) => {
