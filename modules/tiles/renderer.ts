@@ -47,11 +47,9 @@ export class TilesRenderer {
     this._container.addEventListener("pointermove", this.dispatchMouseOrWheelOverEvent);
     this._container.addEventListener("wheel", this.dispatchMouseOrWheelOverEvent, { capture: true });
     window.addEventListener("scroll", this.captureLocation.bind(this));
-    window.requestAnimationFrame(this.refresh.bind(this))
-
+    
     // initialize location of the canvas
     this.captureLocation();
-
   }
 
   get container(): HTMLCanvasElement {

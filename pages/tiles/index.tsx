@@ -7,13 +7,17 @@ import { TilesRenderer } from "../../modules/tiles";
 import { WidgetManager } from "../../modules/tiles/widget-manager";
 import styles from "./tiles_page_style.module.css";
 
-function experiment(renderer: TilesRenderer) {
+function experiment(renderer: TilesRenderer, animation: boolean) {
   function animate(x: number, y: number, scaleStep: number) {
-    const scaleSquared = 1 + Math.cos(scaleStep) * 0.8;
-    renderer.render({
-      canvasOffset: { x, y },
-      scale: scaleSquared * scaleSquared,
-    });
+    if (animation) {
+      const scaleSquared = 1 + Math.cos(scaleStep) * 0.8;
+      renderer.render({
+        canvasOffset: { x, y },
+        scale: scaleSquared * scaleSquared,
+      });
+    } else {
+      renderer.refresh();
+    }
     window.requestAnimationFrame(() => animate(x + 1, y + 1, scaleStep + 0.005));
   }
 
@@ -41,7 +45,7 @@ const TilesAPI: NextPage = () => {
   }, []);
 
   useEffect(() => {
-    experiment(rendererRef.current);
+    experiment(rendererRef.current, false);
   }, []);
 
   return (
