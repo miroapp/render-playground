@@ -6,6 +6,7 @@ export class NavigationManager {
   private _navigationStartCursorPosition: IPoint | undefined = undefined;
 
   private _isInvalid: boolean = true;
+  private _isZooming: boolean = false;
   public position: IPoint;
   public scale: number;
 
@@ -30,8 +31,10 @@ export class NavigationManager {
       this.position.y = this.position.y + this._deltaPan.y;
       this._deltaPan.x = 0;
       this._deltaPan.y = 0;
-      if (this._prevScale === this.scale) {
+      if (this._isZooming && this._prevScale === this.scale) {
         this._isInvalid = false;
+        this._isZooming = false;
+        this.renderer.reset();
       } else {
         this._prevScale = this.scale;
       }
@@ -42,12 +45,13 @@ export class NavigationManager {
   zoomBy(delta: number, cursor?: IPoint): this {
     this.scale = Math.min(Math.max(this.scale + delta * 0.01, 0.05), 4);
     this._isInvalid = true;
+    this._isZooming = true;
     return this;
   }
 
   panBy(deltaX: number, deltaY: number): this {
-    this._deltaPan.x = deltaX;
-    this._deltaPan.y = deltaY;
+    this._deltaPan.x = deltaX / this.scale;
+    this._deltaPan.y = deltaY / this.scale;
     // require refresh
     this._isInvalid = true;
     return this;

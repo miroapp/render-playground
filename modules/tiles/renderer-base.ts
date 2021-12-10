@@ -81,12 +81,6 @@ export abstract class RendererBase {
         canvasOffset: this.navigationManager.position,
         scale: this.navigationManager.scale,
       });
-    } else {
-      this.reset();
-      this.render({
-        canvasOffset: this.navigationManager.position,
-        scale: this.navigationManager.scale,
-      });
     }
     requestAnimationFrame(this.refresh.bind(this));
   }
