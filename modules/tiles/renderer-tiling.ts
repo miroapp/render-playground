@@ -99,23 +99,36 @@ export class RendererTiling extends RendererBase implements BoundaryBox {
   }
 
   private renderViewport(viewport: BoundaryBox, scale: number) {
+    const viewportScaledWidth = viewport.width * this.scale;
+    const viewportScaledHeight = viewport.height * this.scale;
+
+    const x0 = (viewport.x - this.x) * this.scale;
+    const x1 = Math.min(viewportScaledWidth, this.container.width - x0);
+    const x2 = viewportScaledWidth - x1;
+    const y0 = (viewport.y - this.y) * this.scale;
+    const y1 = Math.min(viewportScaledHeight, this.container.height - y0);
+    const y2 = viewportScaledHeight - y1;
+
     const scaleRatio = scale / this.scale;
-    const offsetWidth = this.container.width * scaleRatio;
-    const offsetHeight = this.container.height * scaleRatio;
-    const x0 = (this.x - viewport.x) * scale;
-    const x1 = x0 + offsetWidth;
-    const y0 = (this.y - viewport.y) * scale;
-    const y1 = y0 + offsetHeight;
+
+    const w0 = x1 * scaleRatio;
+    const w1 = x2 * scaleRatio;
+    const h0 = y1 * scaleRatio;
+    const h1 = y2 * scaleRatio;
+
     this.context.clearRect(0, 0, this.container.width, this.container.height);
-    this.context.drawImage(this.tiles[0].canvas, x0, y0, offsetWidth, offsetHeight);
-    this.context.drawImage(this.tiles[1].canvas, x1, y0, offsetWidth, offsetHeight);
-    this.context.drawImage(this.tiles[2].canvas, x0, y1, offsetWidth, offsetHeight);
-    this.context.drawImage(this.tiles[3].canvas, x1, y1, offsetWidth, offsetHeight);
+
+    this.context.drawImage(this.tiles[0].canvas, x0, y0, x1, y1, 0, 0, w0, h0);
+    this.context.drawImage(this.tiles[1].canvas, 0, y0, x2, y1, w0, 0, w1, h0);
+    this.context.drawImage(this.tiles[2].canvas, x0, 0, x1, y2, 0, h0, w0, h1);
+    this.context.drawImage(this.tiles[3].canvas, 0, 0, x2, y2, w0, h0, w1, h1);
+
     this.context.strokeStyle = "#FF0000";
-    this.context.strokeRect(x0, y0, offsetWidth, offsetHeight);
-    this.context.strokeRect(x1, y0, offsetWidth, offsetHeight);
-    this.context.strokeRect(x0, y1, offsetWidth, offsetHeight);
-    this.context.strokeRect(x1, y1, offsetWidth, offsetHeight);
+
+    this.context.strokeRect(0, 0, w0, h0);
+    this.context.strokeRect(w0, 0, w1, h0);
+    this.context.strokeRect(0, h0, w0, h1);
+    this.context.strokeRect(w0, h0, w1, h1);
   }
 
   private invalidateTiles(...indices: number[]): void {
