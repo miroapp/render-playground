@@ -6,18 +6,16 @@ export class NavigationManager {
   private _navigationStartCursorPosition: IPoint | undefined = undefined;
 
   private _isInvalid: boolean = true;
-  private _isZooming: boolean = false;
   public position: IPoint;
   public scale: number;
 
   private _deltaPan: IPoint = { x: 0, y: 0 };
-  private _prevScale: number;
+  private _endZoomTimeout: NodeJS.Timeout;
 
   constructor(readonly renderer: RendererBase) {
     const canvas = this.renderer.container;
     this.position = { x: canvas.width * 0.5, y: canvas.height * 0.5 };
     this.scale = 1;
-    this._prevScale = 1;
 
     canvas.addEventListener("pointerdown", this._startNavigation, false);
     canvas.addEventListener("wheel", this.onMouseWheel, false);
@@ -31,21 +29,17 @@ export class NavigationManager {
       this.position.y = this.position.y + this._deltaPan.y;
       this._deltaPan.x = 0;
       this._deltaPan.y = 0;
-      if (this._isZooming && this._prevScale === this.scale) {
-        this._isInvalid = false;
-        this._isZooming = false;
-        this.renderer.reset();
-      } else {
-        this._prevScale = this.scale;
-      }
     }
     return needsRender;
   }
 
   zoomBy(delta: number, cursor?: IPoint): this {
-    this.scale = Math.min(Math.max(this.scale + delta * 0.01, 0.05), 4);
-    this._isInvalid = true;
-    this._isZooming = true;
+    const newScale = Math.min(Math.max(this.scale + delta * 0.01, 0.05), 4);
+    if (newScale !== this.scale) {
+      this.scale = Math.min(Math.max(this.scale + delta * 0.01, 0.05), 4);
+      clearTimeout(this._endZoomTimeout);
+      this._endZoomTimeout = setTimeout(() => this.renderer.reset(), 100);
+    }
     return this;
   }
 
