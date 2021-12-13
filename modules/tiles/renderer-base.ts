@@ -1,9 +1,10 @@
 import { NavigationManager } from "./navigation-manager";
 import { BoundaryBox, IPoint, ViewportUpdateCallback, VisualUpdateParams } from "./types";
+import { Widget } from "./widget";
 import { WidgetManager } from "./widget-manager";
 
-const CANVAS_WIDTH = 1280;
-const CANVAS_HEIGHT = 800;
+export const CANVAS_WIDTH = 1280;
+export const CANVAS_HEIGHT = 800;
 
 export interface RendererProps {
   canvas: HTMLCanvasElement;
@@ -11,6 +12,9 @@ export interface RendererProps {
 }
 
 export abstract class RendererBase {
+  public renderedWidgets = 0;
+  public renderedTiles = 0;
+
   /**
    * container location on HTML page (top-left)
    */
@@ -22,9 +26,10 @@ export abstract class RendererBase {
 
   protected _container: HTMLCanvasElement;
   protected _context: CanvasRenderingContext2D;
+  protected _requestID: number;
 
   protected widgetManager: WidgetManager;
-  private navigationManager: NavigationManager;
+  navigationManager: NavigationManager;
 
   constructor({ canvas, widgetManager }: RendererProps) {
     const ctx = canvas.getContext("2d");
@@ -70,7 +75,16 @@ export abstract class RendererBase {
     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   }
 
-  abstract render(params: VisualUpdateParams): void;
+  render(params: VisualUpdateParams): void {
+    this._render(params);
+    document.getElementById("widgetInfo").innerText = `
+      Total widgets: ${this.widgetManager.numWidgets}
+      rendered widgets: ${this.renderedWidgets}
+      rendered tiles: ${this.renderedTiles}
+    `;
+  }
+
+  abstract _render(params: VisualUpdateParams): void;
 
   abstract reset(): void;
 
@@ -82,12 +96,16 @@ export abstract class RendererBase {
         scale: this.navigationManager.scale,
       });
     }
-    requestAnimationFrame(this.refresh.bind(this));
+    this._requestID = requestAnimationFrame(this.refresh.bind(this));
   }
 
   onViewportUpdate(callback: ViewportUpdateCallback) {}
 
-  destroy() {}
+  destroy() {
+    cancelAnimationFrame(this._requestID);
+    this.navigationManager.destroy();
+    this.navigationManager = null;
+  }
 
   clientToEngineSpace(x: number, y: number): IPoint {
     return { x: x - this._location.x, y: y - this._location.y };
@@ -103,8 +121,13 @@ export abstract class RendererBase {
     return this._lastMousePosition;
   }
 
-  protected drawContext(context: CanvasRenderingContext2D, box: BoundaryBox, scale: number) {
-    const widgets = this.widgetManager.getWidgets(box);
+  protected drawContext(
+    context: CanvasRenderingContext2D,
+    box: BoundaryBox,
+    scale: number,
+    fromWidgets?: Widget[]
+  ): void {
+    const widgets = this.widgetManager.getWidgets(box, fromWidgets);
     context.clearRect(0, 0, this._container.width, this._container.width);
     widgets.forEach((widget) => {
       context.drawImage(
@@ -116,6 +139,8 @@ export abstract class RendererBase {
         (widget.image.height * scale) / 4
       );
     });
+    this.renderedWidgets += widgets.length;
+    this.renderedTiles += 1;
   }
 
   protected getVisualUpdateParamsBox(params: VisualUpdateParams) {

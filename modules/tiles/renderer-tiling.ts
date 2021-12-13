@@ -1,5 +1,6 @@
 import { RendererBase, RendererProps } from "./renderer-base";
 import { BoundaryBox, contains, intersects, VisualUpdateParams } from "./types";
+import { Widget } from "./widget";
 
 const TILE_INDICES = [0, 1, 2, 3];
 
@@ -34,9 +35,8 @@ export class RendererTiling extends RendererBase implements BoundaryBox {
     });
   }
 
-  render(params: VisualUpdateParams) {
+  _render(params: VisualUpdateParams) {
     const viewport = this.getVisualUpdateParamsBox(params);
-    this.widgetManager.getWidgets(viewport);
 
     // Scale unchanged - panning
     if (params.scale === this.scale) {
@@ -57,12 +57,19 @@ export class RendererTiling extends RendererBase implements BoundaryBox {
           this.moveTilesDown();
         }
       }
-      // Scale changed - zooming. Handle redraw if tiles too big or too small
+      // Scale changed - zooming. Handle redraw if tiles are too small
     } else if (!contains(this, viewport) || viewport.width < this.tileWidth / 2) {
       this.resetTiles(viewport, params.scale);
     }
 
-    this.renderTiles();
+    let widgets;
+
+    if (this.tiles.map((tile) => tile.needsRender).some((needsRender) => needsRender)) {
+      this.renderedWidgets = 0;
+      widgets = this.widgetManager.getWidgets(this);
+    }
+
+    this.renderTiles(widgets);
     this.renderViewport(viewport, params.scale);
   }
 
@@ -76,7 +83,7 @@ export class RendererTiling extends RendererBase implements BoundaryBox {
     this.tileHeight = 0;
   }
 
-  private renderTile(index: number): void {
+  private renderTile(index: number, widgets?: Widget[]): void {
     const tile = this.tiles[index];
 
     if (!tile.needsRender) {
@@ -90,12 +97,12 @@ export class RendererTiling extends RendererBase implements BoundaryBox {
       height: this.tileHeight,
     };
 
-    this.drawContext(tile.ctx, tileBox, this.scale);
+    this.drawContext(tile.ctx, tileBox, this.scale, widgets);
     tile.needsRender = false;
   }
 
-  private renderTiles(): void {
-    TILE_INDICES.forEach((index) => this.renderTile(index));
+  private renderTiles(widgets?: Widget[]): void {
+    TILE_INDICES.forEach((index) => this.renderTile(index, widgets));
   }
 
   private renderViewport(viewport: BoundaryBox, scale: number) {

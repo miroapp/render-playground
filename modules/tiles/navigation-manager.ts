@@ -1,4 +1,4 @@
-import type { RendererBase } from "./renderer-base";
+import { CANVAS_HEIGHT, CANVAS_WIDTH, RendererBase } from "./renderer-base";
 import { IPoint } from "./types";
 
 export class NavigationManager {
@@ -6,11 +6,15 @@ export class NavigationManager {
   private _navigationStartCursorPosition: IPoint | undefined = undefined;
 
   private _isInvalid: boolean = true;
+  private _isZooming: boolean = false;
   public position: IPoint;
   public scale: number;
 
   private _deltaPan: IPoint = { x: 0, y: 0 };
   private _endZoomTimeout: NodeJS.Timeout;
+
+  private _time = 0;
+  private _frames = 0;
 
   constructor(readonly renderer: RendererBase) {
     const canvas = this.renderer.container;
@@ -22,23 +26,29 @@ export class NavigationManager {
   }
 
   refresh() {
-    const needsRender = this._isInvalid;
+    const needsRender = this._isInvalid || this._isZooming;
     if (this._isInvalid) {
       // update position of the camera
       this.position.x = this.position.x + this._deltaPan.x;
       this.position.y = this.position.y + this._deltaPan.y;
       this._deltaPan.x = 0;
       this._deltaPan.y = 0;
+      this._isInvalid = false;
     }
     return needsRender;
   }
 
   zoomBy(delta: number, cursor?: IPoint): this {
-    const newScale = Math.min(Math.max(this.scale + delta * 0.01, 0.05), 4);
+    const newScale = Math.min(Math.max(this.scale * (1 + delta * 0.01), 0.04), 4);
     if (newScale !== this.scale) {
-      this.scale = Math.min(Math.max(this.scale + delta * 0.01, 0.05), 4);
+      this.scale = Math.min(Math.max(this.scale * (1 + delta * 0.01), 0.04), 4);
       clearTimeout(this._endZoomTimeout);
-      this._endZoomTimeout = setTimeout(() => this.renderer.reset(), 100);
+      this._endZoomTimeout = setTimeout(() => {
+        this.renderer.reset();
+        this.renderer.render({ canvasOffset: this.position, scale: this.scale });
+        this._isZooming = false;
+      }, 100);
+      this._isZooming = true;
     }
     return this;
   }
@@ -49,6 +59,71 @@ export class NavigationManager {
     // require refresh
     this._isInvalid = true;
     return this;
+  }
+
+  zoomOutAutomation() {
+    this.position = { x: 0, y: 0 };
+    this.scale = 4;
+    this._time = performance.now();
+    this._frames = 0;
+
+    const automate = () => {
+      if (this.scale > 0.04) {
+        this.zoomBy(-1);
+        this._frames += 1;
+        requestAnimationFrame(() => automate());
+      } else {
+        console.log((1000 * this._frames) / (performance.now() - this._time), "fps");
+      }
+    };
+
+    automate();
+  }
+
+  zoomInAutomation() {
+    this.position = { x: 0, y: 0 };
+    this.scale = 0.04;
+    this._time = performance.now();
+    this._frames = 0;
+
+    const automate = () => {
+      if (this.scale < 4) {
+        this.zoomBy(1);
+        this._frames += 1;
+        requestAnimationFrame(() => automate());
+      } else {
+        console.log((1000 * this._frames) / (performance.now() - this._time), "fps");
+      }
+    };
+
+    automate();
+  }
+
+  panAutomation() {
+    this.scale = 0.04;
+    this.position = { x: -37.5 * CANVAS_WIDTH, y: -37.5 * CANVAS_HEIGHT };
+    this._time = performance.now();
+    this._frames = 0;
+
+    const automate = () => {
+      if (this.position.x < 37.5 * CANVAS_WIDTH) {
+        this.panBy(0.01 * CANVAS_WIDTH, 0.01 * CANVAS_HEIGHT);
+        this._frames += 1;
+        requestAnimationFrame(() => automate());
+      } else {
+        console.log((1000 * this._frames) / (performance.now() - this._time), "fps");
+      }
+    };
+
+    automate();
+  }
+
+  destroy() {
+    const canvas = this.renderer.container;
+    canvas.removeEventListener("pointermove", this._navigate, false);
+    canvas.removeEventListener("pointerup", this._endNavigation, false);
+    canvas.removeEventListener("pointerdown", this._startNavigation, false);
+    canvas.removeEventListener("wheel", this.onMouseWheel, false);
   }
 
   private onMouseWheel = (event: WheelEvent) => {

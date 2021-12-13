@@ -1,4 +1,5 @@
-import { BoundaryBox, contains, intersects, isWithin } from "./types";
+import { CANVAS_HEIGHT, CANVAS_WIDTH } from "./renderer-base";
+import { BoundaryBox, intersects, isWithin } from "./types";
 import { Widget } from "./widget";
 
 const AVG_DISTANCE = 200;
@@ -6,7 +7,11 @@ const AVG_DISTANCE = 200;
 export class WidgetManager {
   private worldBox: BoundaryBox = { x: 0, y: 0, width: 0, height: 0 };
   private assets: HTMLImageElement[] = [];
-  widgets: Widget[] = [];
+  private widgets: Widget[] = [];
+
+  get numWidgets() {
+    return this.widgets.length;
+  }
 
   constructor() {
     for (let i = 1; i < 67; i++) {
@@ -14,21 +19,19 @@ export class WidgetManager {
       asset.src = `/tiles/${i.toString().padStart(2, "0")}.png`;
       this.assets.push(asset);
     }
+
+    this.createWidgets({
+      x: -50 * CANVAS_WIDTH,
+      y: -50 * CANVAS_HEIGHT,
+      width: 100 * CANVAS_WIDTH,
+      height: 100 * CANVAS_HEIGHT,
+    });
   }
 
-  getWidgets(box: BoundaryBox) {
+  getWidgets(box: BoundaryBox, widgets = this.widgets) {
     const result: Widget[] = [];
 
-    if (!contains(this.worldBox, box)) {
-      this.createWidgets({
-        x: box.x - box.width,
-        y: box.y - box.height,
-        width: 3 * box.width,
-        height: 3 * box.height,
-      });
-    }
-
-    this.widgets.forEach((widget) => {
+    widgets.forEach((widget) => {
       const widgetBox = widget.getBoundary();
       if (intersects(box, widgetBox)) {
         result.push(widget);
