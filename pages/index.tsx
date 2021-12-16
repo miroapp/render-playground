@@ -32,9 +32,9 @@ const Home: NextPage = () => {
         </div>
 
         <div className={styles.grid}>
-          <a href="/points" className={styles.card}>
-            <h2>Points &rarr;</h2>
-            <p>Experiment with points.</p>
+          <a href="/webworkers" className={styles.card}>
+            <h2>Web Workers &rarr;</h2>
+            <p>Experiment with Web Workers.</p>
           </a>
         </div>
       </main>
