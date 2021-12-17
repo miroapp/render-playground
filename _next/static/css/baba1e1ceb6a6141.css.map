@@ -1,0 +1,1 @@
+{"version":3,"sources":["webpack://_N_E/pages/points/points_page_style.module.css"],"names":[],"mappings":"AAAA,gCACE,eACF,CAEA,iCACE,qBAAuB,CACvB,gBACF","file":"static/css/baba1e1ceb6a6141.css","sourcesContent":[".title {\n  margin: 1em 0.5em;\n}\n\n.canvas {\n  border: 1px solid black;\n  margin-left: 15px;\n}\n"],"sourceRoot":""}
