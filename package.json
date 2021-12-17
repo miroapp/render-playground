@@ -4,25 +4,28 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "export": "next export",
+    "serve": "serve ./out",
     "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
-    "next": "^12.0.2",
+    "next": "^12.0.7",
     "react": "^17.0.2",
     "react-dom": "^17.0.2"
   },
   "devDependencies": {
-    "@types/react": "^17.0.33",
+    "@types/react": "^17.0.37",
     "@types/react-dom": "^17.0.11",
-    "eslint": "^8.1.0",
-    "eslint-config-next": "^12.0.2",
+    "eslint": "^8.4.1",
+    "eslint-config-next": "^12.0.7",
     "eslint-config-prettier": "^8.3.0",
     "gl-matrix": "^3.4.3",
     "glslify": "^7.1.1",
     "glslify-loader": "^2.0.0",
-    "prettier": "^2.4.1",
+    "prettier": "^2.5.1",
     "raw-loader": "^4.0.2",
-    "typescript": "^4.4.4"
+    "serve": "^13.0.2",
+    "typescript": "^4.5.4"
   }
 }

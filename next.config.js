@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
 module.exports = {
   reactStrictMode: true,
+  basePath: process.env.NEXT_BASE_PATH,
+  assetPrefix: process.env.NEXT_ASSET_PREFIX,
 
   webpack: (config, options) => {
     config.module.rules.push({
