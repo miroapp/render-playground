@@ -17,6 +17,14 @@ const Home: NextPage = () => {
           (WebGL / WebGPU / etc.)
         </p>
 
+
+        <div className={styles.grid}>
+          <a href="/tiles" className={styles.card}>
+            <h2>Tiles API &rarr;</h2>
+            <p>Experiment with Tiles API.</p>
+          </a>
+        </div>
+
         <div className={styles.grid}>
           <a href="/blending-modes" className={styles.card}>
             <h2>Blending Modes &rarr;</h2>
