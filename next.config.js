@@ -5,6 +5,11 @@ module.exports = {
   basePath: process.env.NEXT_BASE_PATH,
   assetPrefix: process.env.NEXT_ASSET_PREFIX,
 
+  publicRuntimeConfig: {
+    basePath: process.env.NEXT_BASE_PATH,
+    assetPrefix: process.env.NEXT_ASSET_PREFIX,
+  },
+
   webpack: (config, options) => {
     config.module.rules.push({
       test: /\.(glsl|vs|fs|vert|frag)$/,

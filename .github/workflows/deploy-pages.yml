@@ -38,7 +38,7 @@ jobs:
       - name: Build and Export
         env:
           NEXT_BASE_PATH: /render-playground
-          NEXT_ASSET_PREFIX: /render-playground/
+          NEXT_ASSET_PREFIX: /render-playground
 
         run: |
           yarn build

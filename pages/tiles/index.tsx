@@ -2,11 +2,14 @@
 /* eslint-disable @next/next/no-img-element */
 import type { NextPage } from "next";
 import { useEffect, useRef } from "react";
+import getConfig from 'next/config';
 // Tiles System
 import { RendererClassic, RendererTiling } from "../../modules/tiles";
 import { RendererBase } from "../../modules/tiles/renderer-base";
 import { WidgetManager } from "../../modules/tiles/widget-manager";
 import styles from "./tiles_page_style.module.css";
+
+const { assetPrefix } = getConfig().publicRuntimeConfig;
 
 const TilesAPI: NextPage = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -15,7 +18,7 @@ const TilesAPI: NextPage = () => {
   useEffect(() => {
     // Constructor
     if (canvasRef.current) {
-      widgetManagerRef.current = new WidgetManager();
+      widgetManagerRef.current = new WidgetManager({ assetPrefix });
       rendererRef.current = new RendererTiling({
         canvas: canvasRef.current,
         widgetManager: widgetManagerRef.current,

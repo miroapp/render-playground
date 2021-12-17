@@ -4,6 +4,10 @@ import { Widget } from "./widget";
 
 const AVG_DISTANCE = 200;
 
+interface WidgetManagerOptions {
+  assetPrefix?: string
+}
+
 export class WidgetManager {
   private worldBox: BoundaryBox = { x: 0, y: 0, width: 0, height: 0 };
   private assets: HTMLImageElement[] = [];
@@ -13,10 +17,10 @@ export class WidgetManager {
     return this.widgets.length;
   }
 
-  constructor() {
+  constructor({ assetPrefix = '' }: WidgetManagerOptions = {}) {
     for (let i = 1; i < 67; i++) {
       const asset = document.createElement("img");
-      asset.src = `/tiles/${i.toString().padStart(2, "0")}.png`;
+      asset.src = `${assetPrefix}/tiles/${i.toString().padStart(2, "0")}.png`;
       this.assets.push(asset);
     }
 
