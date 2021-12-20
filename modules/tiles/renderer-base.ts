@@ -1,7 +1,7 @@
-import { NavigationManager } from "./navigation-manager";
-import { BoundaryBox, IPoint, ViewportUpdateCallback, VisualUpdateParams } from "./types";
-import { Widget } from "./widget";
-import { WidgetManager } from "./widget-manager";
+import { NavigationManager } from './navigation-manager';
+import { BoundaryBox, IPoint, ViewportUpdateCallback, VisualUpdateParams } from './types';
+import { Widget } from './widget';
+import { WidgetManager } from './widget-manager';
 
 export const CANVAS_WIDTH = 1280;
 export const CANVAS_HEIGHT = 800;
@@ -32,10 +32,10 @@ export abstract class RendererBase {
   navigationManager: NavigationManager;
 
   constructor({ canvas, widgetManager }: RendererProps) {
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext('2d');
 
     if (ctx === null) {
-      throw new Error("Canvas2D renderer is uninitialized!");
+      throw new Error('Canvas2D renderer is uninitialized!');
     }
 
     canvas.width = CANVAS_WIDTH;
@@ -47,18 +47,18 @@ export abstract class RendererBase {
     this.widgetManager = widgetManager;
     this.navigationManager = new NavigationManager(this);
 
-    this._container.addEventListener("pointerover", this.dispatchMouseOrWheelOverEvent);
-    this._container.addEventListener("pointermove", this.dispatchMouseOrWheelOverEvent);
-    this._container.addEventListener("wheel", this.dispatchMouseOrWheelOverEvent, {
-      capture: true,
+    this._container.addEventListener('pointerover', this.dispatchMouseOrWheelOverEvent);
+    this._container.addEventListener('pointermove', this.dispatchMouseOrWheelOverEvent);
+    this._container.addEventListener('wheel', this.dispatchMouseOrWheelOverEvent, {
+      capture: true
     });
-    window.addEventListener("scroll", this.captureLocation.bind(this));
+    window.addEventListener('scroll', this.captureLocation.bind(this));
 
     // initialize location of the canvas
     this.captureLocation();
 
     // Start rendering loop
-    setTimeout(this.refresh.bind(this), 1000);
+    setTimeout(this.refresh, 1000);
   }
 
   get container(): HTMLCanvasElement {
@@ -77,7 +77,7 @@ export abstract class RendererBase {
 
   render(params: VisualUpdateParams): void {
     this._render(params);
-    document.getElementById("widgetInfo").innerText = `
+    document.getElementById('widgetInfo').innerText = `
       Total widgets: ${this.widgetManager.numWidgets}
       rendered widgets: ${this.renderedWidgets}
       rendered tiles: ${this.renderedTiles}
@@ -88,18 +88,22 @@ export abstract class RendererBase {
 
   abstract reset(): void;
 
-  refresh() {
+  refresh = () => {
+    if (!this.navigationManager) return;
+
     const needsRender = this.navigationManager.refresh();
+
     if (needsRender) {
       this.render({
         canvasOffset: this.navigationManager.position,
-        scale: this.navigationManager.scale,
+        scale: this.navigationManager.scale
       });
     }
-    this._requestID = requestAnimationFrame(this.refresh.bind(this));
-  }
+    this._requestID = requestAnimationFrame(this.refresh);
+  };
 
-  onViewportUpdate(callback: ViewportUpdateCallback) {}
+  onViewportUpdate(callback: ViewportUpdateCallback) {
+  }
 
   destroy() {
     cancelAnimationFrame(this._requestID);

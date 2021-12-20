@@ -1,77 +1,137 @@
 /* eslint-disable jsx-a11y/alt-text */
 /* eslint-disable @next/next/no-img-element */
-import type { NextPage } from "next";
-import { useEffect, useRef } from "react";
+import type { NextPage } from 'next';
+import React, { useEffect, useRef, useState } from 'react';
 import getConfig from 'next/config';
 // Tiles System
-import { RendererClassic, RendererTiling } from "../../modules/tiles";
-import { RendererBase } from "../../modules/tiles/renderer-base";
-import { WidgetManager } from "../../modules/tiles/widget-manager";
-import styles from "./tiles_page_style.module.css";
+import { RendererClassic, RendererTiling, RendererTiling2 } from '../../modules/tiles';
+import { RendererBase } from '../../modules/tiles/renderer-base';
+import { WidgetManager } from '../../modules/tiles/widget-manager';
+import { buttonGroup, Leva, useControls } from 'leva';
+import styles from './tiles_page_style.module.css';
+
+const enum RenderingEngine {
+  Classic = 'classic',
+  Tiling = 'tiling',
+  Tiling2 = 'tiling2'
+}
 
 const { assetPrefix } = getConfig().publicRuntimeConfig;
 
 const TilesAPI: NextPage = () => {
+  const [renderingEngine, setRenderingEngine] = useState<RenderingEngine>(RenderingEngine.Tiling2);
+
+  const [{ tileSize, showTiles }, set] = useControls(() => ({
+    renderingEngine: {
+      label: 'Rendering Engine',
+      value: renderingEngine,
+      options: {
+        'Classic': 'classic',
+        'Tiling': 'tiling',
+        'Tiling 2': 'tiling2'
+      },
+      onChange: setRenderingEngine
+    },
+    ...(
+      renderingEngine === 'tiling2' ? {
+        tileSize: {
+          label: 'Title Size',
+          value: 512,
+          min: 256,
+          max: 1024,
+          step: 1
+        },
+        showTiles: {
+          label: 'Show Tiles',
+          value: true
+        }
+      } : {}
+    ),
+    zoomIn: buttonGroup({
+      label: 'Zoom-In Automation',
+      opts: {
+        'Start': () => {
+          rendererRef.current.navigationManager.zoomInAutomation();
+        },
+        'Stop': () => {
+          // TODO: Stop automation
+        }
+      },
+    }),
+    zoomOut: buttonGroup({
+      label: 'Zoom-Out Automation',
+      opts: {
+        'Start': () => {
+          rendererRef.current.navigationManager.zoomOutAutomation();
+        },
+        'Stop': () => {
+          // TODO: Stop automation
+        }
+      },
+    }),
+    pan: buttonGroup({
+      label: 'Pan Automation',
+      opts: {
+        'Start': () => {
+          rendererRef.current.navigationManager.panAutomation();
+        },
+        'Stop': () => {
+          // TODO: Stop automation
+        }
+      },
+    }),
+  }), [renderingEngine]);
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const widgetManagerRef = useRef<WidgetManager>(null);
   const rendererRef = useRef<RendererBase>(null);
+
   useEffect(() => {
-    // Constructor
-    if (canvasRef.current) {
-      widgetManagerRef.current = new WidgetManager({ assetPrefix });
-      rendererRef.current = new RendererTiling({
-        canvas: canvasRef.current,
-        widgetManager: widgetManagerRef.current,
-      });
+    widgetManagerRef.current = new WidgetManager({ assetPrefix });
+  }, []);
+
+  useEffect(() => {
+    if (!canvasRef.current) return;
+
+    switch (renderingEngine) {
+      case RenderingEngine.Classic:
+        rendererRef.current = new RendererClassic({
+          canvas: canvasRef.current,
+          widgetManager: widgetManagerRef.current
+        });
+        break;
+
+      case RenderingEngine.Tiling:
+        rendererRef.current = new RendererTiling({
+          canvas: canvasRef.current,
+          widgetManager: widgetManagerRef.current
+        });
+        break;
+
+      case RenderingEngine.Tiling2:
+        rendererRef.current = new RendererTiling2({
+          canvas: canvasRef.current,
+          widgetManager: widgetManagerRef.current,
+          tileSize,
+          showTiles
+        });
     }
-    // Destructor
+
     return () => {
       rendererRef.current.destroy();
       rendererRef.current = null;
-    };
-  }, []);
-
-  function setTiling() {
-    rendererRef.current?.destroy();
-    rendererRef.current = new RendererTiling({
-      canvas: canvasRef.current,
-      widgetManager: widgetManagerRef.current,
-    });
-  }
-
-  function setClassic() {
-    rendererRef.current?.destroy();
-    rendererRef.current = new RendererClassic({
-      canvas: canvasRef.current,
-      widgetManager: widgetManagerRef.current,
-    });
-  }
-
-  function zoomInAutomation() {
-    rendererRef.current.navigationManager.zoomInAutomation();
-  }
-
-  function zoomOutAutomation() {
-    rendererRef.current.navigationManager.zoomOutAutomation();
-  }
-
-  function panAutomation() {
-    rendererRef.current.navigationManager.panAutomation();
-  }
+    }
+  }, [renderingEngine, tileSize, showTiles]);
 
   return (
     <div>
       <div>
         <h2 className={styles.title}>[PoC] Tiles API</h2>
         <canvas ref={canvasRef} className={styles.canvas} />
-        <div>
-          <button onClick={setTiling}>Tiling</button>
-          <button onClick={setClassic}>Classic</button>
-          <button onClick={zoomInAutomation}>Zoom in</button>
-          <button onClick={zoomOutAutomation}>Zoom out</button>
-          <button onClick={panAutomation}>Pan</button>
+        <div id="widgetInfo" className={styles.widgetInfo} />
+        <div className={styles.tweaks}>
+          <Leva fill />
         </div>
-        <div id="widgetInfo" className={styles.widgetInfo}></div>
       </div>
     </div>
   );
