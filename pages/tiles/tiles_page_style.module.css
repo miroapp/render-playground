@@ -1,23 +1,29 @@
-.title {
-  margin: 1em 0.5em;
+.canvas {
+  width: 100vw;
+  height: 100vh;
 }
 
-.canvas {
-  border: 1px solid black;
-  margin-left: 15px;
+.title {
+  background: rgba(255, 255, 255, 0.75);
+  position: absolute;
+  top: 0;
+  left: 15px;
+  padding: 0 15px;
 }
 
 .widgetInfo {
+  background: rgba(255, 255, 255, 0.75);
   position: absolute;
-  top: 0;
-  right: 0;
-  margin-right: 15px;
+  top: 15px;
+  right: 15px;
+  width: 250px;
+  height: 100px;
+  padding: 10px 15px;
 }
 
 .tweaks {
   position: absolute;
   width: 350px;
-  top: 100px;
-  right: 0;
-  margin-right: 15px;
+  bottom: 15px;
+  right: 15px;
 }

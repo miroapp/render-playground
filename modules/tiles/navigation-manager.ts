@@ -1,5 +1,5 @@
-import { CANVAS_HEIGHT, CANVAS_WIDTH, RendererBase } from "./renderer-base";
-import { IPoint } from "./types";
+import { RendererBase } from './renderer-base';
+import { IPoint } from './types';
 
 export class NavigationManager {
   private _lastCursorPosition: IPoint = { x: 0, y: 0 };
@@ -16,13 +16,17 @@ export class NavigationManager {
   private _time = 0;
   private _frames = 0;
 
+  private panAutomationRafId: number;
+  private zoomInAutomationRafId: number;
+  private zoomOutAutomationRafId: number;
+
   constructor(readonly renderer: RendererBase) {
     const canvas = this.renderer.container;
-    this.position = { x: canvas.width * 0.5, y: canvas.height * 0.5 };
+    this.position = { x: 0, y: 0 };
     this.scale = 1;
 
-    canvas.addEventListener("pointerdown", this._startNavigation, false);
-    canvas.addEventListener("wheel", this.onMouseWheel, false);
+    canvas.addEventListener('pointerdown', this._startNavigation, false);
+    canvas.addEventListener('wheel', this.onMouseWheel, false);
   }
 
   refresh() {
@@ -61,7 +65,9 @@ export class NavigationManager {
     return this;
   }
 
-  zoomOutAutomation() {
+  startZoomOutAutomation() {
+    cancelAnimationFrame(this.zoomOutAutomationRafId);
+
     this.position = { x: 0, y: 0 };
     this.scale = 4;
     this._time = performance.now();
@@ -71,16 +77,23 @@ export class NavigationManager {
       if (this.scale > 0.04) {
         this.zoomBy(-1);
         this._frames += 1;
-        requestAnimationFrame(() => automate());
+        this.zoomOutAutomationRafId = requestAnimationFrame(automate);
       } else {
-        console.log((1000 * this._frames) / (performance.now() - this._time), "fps");
+        console.log((1000 * this._frames) / (performance.now() - this._time), 'fps');
       }
     };
 
     automate();
   }
 
-  zoomInAutomation() {
+  stopZoomOutAutomation() {
+    cancelAnimationFrame(this.zoomOutAutomationRafId);
+    console.log((1000 * this._frames) / (performance.now() - this._time), 'fps');
+  }
+
+  startZoomInAutomation() {
+    cancelAnimationFrame(this.zoomInAutomationRafId);
+
     this.position = { x: 0, y: 0 };
     this.scale = 0.04;
     this._time = performance.now();
@@ -90,40 +103,62 @@ export class NavigationManager {
       if (this.scale < 4) {
         this.zoomBy(1);
         this._frames += 1;
-        requestAnimationFrame(() => automate());
+        this.zoomInAutomationRafId = requestAnimationFrame(automate);
       } else {
-        console.log((1000 * this._frames) / (performance.now() - this._time), "fps");
+        console.log((1000 * this._frames) / (performance.now() - this._time), 'fps');
       }
     };
 
     automate();
   }
 
-  panAutomation() {
-    this.scale = 0.04;
-    this.position = { x: -37.5 * CANVAS_WIDTH, y: -37.5 * CANVAS_HEIGHT };
+  stopZoomInAutomation() {
+    cancelAnimationFrame(this.zoomInAutomationRafId);
+    console.log((1000 * this._frames) / (performance.now() - this._time), 'fps');
+  }
+
+  startPanAutomation() {
+    cancelAnimationFrame(this.panAutomationRafId);
+
+    let { width } = this.renderer.container;
+
+    this.position = { x: 0, y: 0};
     this._time = performance.now();
     this._frames = 0;
 
+    let dd = 1;
+    let dx = 20;
+    let dy = 20;
+
     const automate = () => {
-      if (this.position.x < 37.5 * CANVAS_WIDTH) {
-        this.panBy(0.01 * CANVAS_WIDTH, 0.01 * CANVAS_HEIGHT);
-        this._frames += 1;
-        requestAnimationFrame(() => automate());
-      } else {
-        console.log((1000 * this._frames) / (performance.now() - this._time), "fps");
+      this.panBy(dx * dd, dy * dd);
+
+      this._frames += 1;
+      this.panAutomationRafId = requestAnimationFrame(automate);
+
+      const bound = width / this.scale
+
+      if (this.position.x > bound) {
+        dd = -1;
+      } else if (this.position.x < -bound) {
+        dd = 1;
       }
     };
 
     automate();
+  }
+
+  stopPanAutomation() {
+    cancelAnimationFrame(this.panAutomationRafId);
+    console.log((1000 * this._frames) / (performance.now() - this._time), 'fps');
   }
 
   destroy() {
     const canvas = this.renderer.container;
-    canvas.removeEventListener("pointermove", this._navigate, false);
-    canvas.removeEventListener("pointerup", this._endNavigation, false);
-    canvas.removeEventListener("pointerdown", this._startNavigation, false);
-    canvas.removeEventListener("wheel", this.onMouseWheel, false);
+    canvas.removeEventListener('pointermove', this._navigate, false);
+    canvas.removeEventListener('pointerup', this._endNavigation, false);
+    canvas.removeEventListener('pointerdown', this._startNavigation, false);
+    canvas.removeEventListener('wheel', this.onMouseWheel, false);
   }
 
   private onMouseWheel = (event: WheelEvent) => {
@@ -145,17 +180,17 @@ export class NavigationManager {
     // this._navigationStartCursorPosition.x = position.x;
     // this._navigationStartCursorPosition.y = position.y;
 
-    canvas.addEventListener("pointermove", this._navigate, false);
-    canvas.addEventListener("pointerup", this._endNavigation, false);
+    canvas.addEventListener('pointermove', this._navigate, false);
+    canvas.addEventListener('pointerup', this._endNavigation, false);
 
-    canvas.removeEventListener("pointerdown", this._startNavigation, false);
+    canvas.removeEventListener('pointerdown', this._startNavigation, false);
   };
 
   private _endNavigation = (event: PointerEvent) => {
     const canvas = this.renderer.container;
-    canvas.removeEventListener("pointermove", this._navigate, false);
-    canvas.removeEventListener("pointerup", this._endNavigation, false);
-    canvas.addEventListener("pointerdown", this._startNavigation, false);
+    canvas.removeEventListener('pointermove', this._navigate, false);
+    canvas.removeEventListener('pointerup', this._endNavigation, false);
+    canvas.addEventListener('pointerdown', this._startNavigation, false);
   };
 
   private _navigate = (event: PointerEvent) => {

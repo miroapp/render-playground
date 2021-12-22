@@ -2,13 +2,18 @@
 /* eslint-disable @next/next/no-img-element */
 import type { NextPage } from 'next';
 import React, { useEffect, useRef, useState } from 'react';
+import useCallbackRef from '../../hooks/useCallbackRef';
 import getConfig from 'next/config';
 // Tiles System
 import { RendererClassic, RendererTiling, RendererTiling2 } from '../../modules/tiles';
-import { RendererBase } from '../../modules/tiles/renderer-base';
 import { WidgetManager } from '../../modules/tiles/widget-manager';
 import { buttonGroup, Leva, useControls } from 'leva';
 import styles from './tiles_page_style.module.css';
+import {
+  PanSimulationInterface,
+  RendererInterface,
+  ZoomSimulationInterface
+} from '../../modules/tiles/renderer-interface';
 
 const enum RenderingEngine {
   Classic = 'classic',
@@ -16,10 +21,26 @@ const enum RenderingEngine {
   Tiling2 = 'tiling2'
 }
 
-const { assetPrefix } = getConfig().publicRuntimeConfig;
+const { assetPrefix = '' } = getConfig().publicRuntimeConfig || {};
+
+const WORLD_WIDTH = 200_000;
+const WORLD_HEIGHT = 200_000;
+
+const TWEAKS_STORAGE_KEY = 'tiling-tweaks';
+
+interface Tweaks {
+  renderingEngine: RenderingEngine,
+  tileSize?: number,
+  showTiles?: boolean
+}
 
 const TilesAPI: NextPage = () => {
-  const [renderingEngine, setRenderingEngine] = useState<RenderingEngine>(RenderingEngine.Tiling2);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const widgetManagerRef = useRef<WidgetManager>(null);
+  const rendererRef = useRef<RendererInterface & ZoomSimulationInterface & PanSimulationInterface>(null);
+
+  const [renderingEngine, setRenderingEngine] = useState<RenderingEngine>(RenderingEngine.Tiling);
+  const [pendingTweaksData, setPendingTweaksData] = useState<Tweaks>();
 
   const [{ tileSize, showTiles }, set] = useControls(() => ({
     renderingEngine: {
@@ -30,15 +51,19 @@ const TilesAPI: NextPage = () => {
         'Tiling': 'tiling',
         'Tiling 2': 'tiling2'
       },
-      onChange: setRenderingEngine
+      onChange: (value) => {
+        if (renderingEngine !== value) {
+          setRenderingEngine(value);
+        }
+      }
     },
     ...(
       renderingEngine === 'tiling2' ? {
         tileSize: {
           label: 'Title Size',
-          value: 512,
-          min: 256,
-          max: 1024,
+          value: 2048,
+          min: 512,
+          max: 4096,
           step: 1
         },
         showTiles: {
@@ -51,48 +76,93 @@ const TilesAPI: NextPage = () => {
       label: 'Zoom-In Automation',
       opts: {
         'Start': () => {
-          rendererRef.current.navigationManager.zoomInAutomation();
+          rendererRef.current.startZoomInAutomation();
         },
         'Stop': () => {
-          // TODO: Stop automation
+          rendererRef.current.stopZoomInAutomation();
+        },
+        'Reset': () => {
+          rendererRef.current.resetZoom();
         }
-      },
+      }
     }),
     zoomOut: buttonGroup({
       label: 'Zoom-Out Automation',
       opts: {
         'Start': () => {
-          rendererRef.current.navigationManager.zoomOutAutomation();
+          rendererRef.current.startZoomOutAutomation();
         },
         'Stop': () => {
-          // TODO: Stop automation
+          rendererRef.current.stopZoomOutAutomation();
+        },
+        'Reset': () => {
+          rendererRef.current.resetZoom();
         }
-      },
+      }
     }),
     pan: buttonGroup({
       label: 'Pan Automation',
       opts: {
         'Start': () => {
-          rendererRef.current.navigationManager.panAutomation();
+          rendererRef.current.startPanAutomation();
         },
         'Stop': () => {
-          // TODO: Stop automation
+          rendererRef.current.stopPanAutomation();
         }
-      },
+      }
     }),
   }), [renderingEngine]);
 
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const widgetManagerRef = useRef<WidgetManager>(null);
-  const rendererRef = useRef<RendererBase>(null);
+  const loadTweaks = useCallbackRef(() => {
+    try {
+      const data: Tweaks = JSON.parse(localStorage.getItem(TWEAKS_STORAGE_KEY));
+
+      if (data.renderingEngine) {
+        setRenderingEngine(data.renderingEngine);
+      }
+
+      setPendingTweaksData(data);
+    } catch (err) {
+      console.error(err);
+      localStorage.removeItem(TWEAKS_STORAGE_KEY);
+    }
+  });
+
+  const loadPendingTweaks = useCallbackRef(() => {
+    const data = pendingTweaksData;
+
+    if (!data) return;
+
+    if (renderingEngine === 'tiling2') {
+      set({
+        renderingEngine: data.renderingEngine,
+        tileSize: data.tileSize,
+        showTiles: data.showTiles
+      });
+    } else {
+      set({
+        renderingEngine: data.renderingEngine
+      });
+    }
+  });
 
   useEffect(() => {
-    widgetManagerRef.current = new WidgetManager({ assetPrefix });
+      loadTweaks();
+    }, [loadTweaks]
+  );
+
+  useEffect(() => {
+    loadPendingTweaks();
+  }, [loadPendingTweaks, pendingTweaksData]);
+
+  useEffect(() => {
+    widgetManagerRef.current = new WidgetManager({
+      width: WORLD_WIDTH,
+      height: WORLD_HEIGHT
+    }, { assetPrefix });
   }, []);
 
-  useEffect(() => {
-    if (!canvasRef.current) return;
-
+  const createRenderingEngine = useCallbackRef(() => {
     switch (renderingEngine) {
       case RenderingEngine.Classic:
         rendererRef.current = new RendererClassic({
@@ -116,18 +186,41 @@ const TilesAPI: NextPage = () => {
           showTiles
         });
     }
+  })
+
+  useEffect(() => {
+    if (rendererRef.current instanceof RendererTiling2) {
+      rendererRef.current.updateSettings({
+        tileSize,
+        showTiles
+      });
+    }
+  }, [tileSize, showTiles]);
+
+  useEffect(() => {
+    if (!canvasRef.current) return;
+
+    createRenderingEngine();
 
     return () => {
       rendererRef.current.destroy();
       rendererRef.current = null;
-    }
+    };
+  }, [renderingEngine, createRenderingEngine]);
+
+  useEffect(() => {
+    localStorage.setItem(TWEAKS_STORAGE_KEY, JSON.stringify({
+      renderingEngine,
+      tileSize,
+      showTiles
+    }));
   }, [renderingEngine, tileSize, showTiles]);
 
   return (
     <div>
       <div>
-        <h2 className={styles.title}>[PoC] Tiles API</h2>
         <canvas ref={canvasRef} className={styles.canvas} />
+        <h2 className={styles.title}>[PoC] Tiles Renderer</h2>
         <div id="widgetInfo" className={styles.widgetInfo} />
         <div className={styles.tweaks}>
           <Leva fill />

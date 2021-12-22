@@ -2,18 +2,21 @@ import { NavigationManager } from './navigation-manager';
 import { BoundaryBox, IPoint, ViewportUpdateCallback, VisualUpdateParams } from './types';
 import { Widget } from './widget';
 import { WidgetManager } from './widget-manager';
-
-export const CANVAS_WIDTH = 1280;
-export const CANVAS_HEIGHT = 800;
+import {
+  PanSimulationInterface,
+  RendererInterface,
+  ZoomSimulationInterface
+} from './renderer-interface';
 
 export interface RendererProps {
   canvas: HTMLCanvasElement;
   widgetManager: WidgetManager;
 }
 
-export abstract class RendererBase {
-  public renderedWidgets = 0;
+export abstract class RendererBase implements RendererInterface, ZoomSimulationInterface, PanSimulationInterface {
   public renderedTiles = 0;
+  public renderedWidgets = 0;
+  public renderCount = 0;
 
   /**
    * container location on HTML page (top-left)
@@ -26,7 +29,7 @@ export abstract class RendererBase {
 
   protected _container: HTMLCanvasElement;
   protected _context: CanvasRenderingContext2D;
-  protected _requestID: number;
+  protected _rafId: number;
 
   protected widgetManager: WidgetManager;
   navigationManager: NavigationManager;
@@ -38,8 +41,10 @@ export abstract class RendererBase {
       throw new Error('Canvas2D renderer is uninitialized!');
     }
 
-    canvas.width = CANVAS_WIDTH;
-    canvas.height = CANVAS_HEIGHT;
+    const { width, height } = canvas.getBoundingClientRect();
+
+    canvas.width = width * devicePixelRatio;
+    canvas.height = height * devicePixelRatio;
 
     this._container = canvas;
     this._context = ctx;
@@ -58,7 +63,9 @@ export abstract class RendererBase {
     this.captureLocation();
 
     // Start rendering loop
-    setTimeout(this.refresh, 1000);
+    setTimeout(() => this.refresh(), 1000);
+
+    window.addEventListener('resize', this.handleResize);
   }
 
   get container(): HTMLCanvasElement {
@@ -75,38 +82,57 @@ export abstract class RendererBase {
     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   }
 
+  handleResize = () => {
+    const { width, height } = this._container.getBoundingClientRect();
+
+    const prevWidth = this._container.width / devicePixelRatio;
+    const prevHeight = this._container.height / devicePixelRatio;
+
+    this._container.width = width * devicePixelRatio;
+    this._container.height = height * devicePixelRatio;
+
+    this.navigationManager.panBy(width - prevWidth, height - prevHeight);
+
+    this.refresh();
+  }
+
   render(params: VisualUpdateParams): void {
     this._render(params);
-    document.getElementById('widgetInfo').innerText = `
-      Total widgets: ${this.widgetManager.numWidgets}
-      rendered widgets: ${this.renderedWidgets}
-      rendered tiles: ${this.renderedTiles}
-    `;
+
+    document.getElementById('widgetInfo').innerText =
+      `Total widgets: ${this.widgetManager.numWidgets}
+      Rendered tiles: ${this.renderedTiles}
+      Rendered widgets: ${this.renderedWidgets}
+      Render count: ${this.renderCount}`;
   }
 
   abstract _render(params: VisualUpdateParams): void;
 
   abstract reset(): void;
 
-  refresh = () => {
+  refresh = (force: boolean = false) => {
     if (!this.navigationManager) return;
 
     const needsRender = this.navigationManager.refresh();
 
-    if (needsRender) {
+    if (force || needsRender) {
       this.render({
         canvasOffset: this.navigationManager.position,
         scale: this.navigationManager.scale
       });
     }
-    this._requestID = requestAnimationFrame(this.refresh);
+
+    cancelAnimationFrame(this._rafId);
+    this._rafId = requestAnimationFrame(() => this.refresh());
   };
 
   onViewportUpdate(callback: ViewportUpdateCallback) {
   }
 
   destroy() {
-    cancelAnimationFrame(this._requestID);
+    window.removeEventListener('resize', this.handleResize);
+
+    cancelAnimationFrame(this._rafId);
     this.navigationManager.destroy();
     this.navigationManager = null;
   }
@@ -131,7 +157,7 @@ export abstract class RendererBase {
     scale: number,
     fromWidgets?: Widget[]
   ): void {
-    const widgets = this.widgetManager.getWidgets(box, fromWidgets);
+    const widgets = this.widgetManager.getWidgets(box, 1, fromWidgets);
     context.clearRect(0, 0, this._container.width, this._container.width);
     widgets.forEach((widget) => {
       context.drawImage(
@@ -145,6 +171,7 @@ export abstract class RendererBase {
     });
     this.renderedWidgets += widgets.length;
     this.renderedTiles += 1;
+    this.renderCount += 1;
   }
 
   protected getVisualUpdateParamsBox(params: VisualUpdateParams) {
@@ -165,4 +192,34 @@ export abstract class RendererBase {
   private dispatchMouseOrWheelOverEvent = (event: MouseEvent | WheelEvent | PointerEvent) => {
     this.setMousePosition(event.clientX, event.clientY);
   };
+
+  resetZoom() {
+    console.log('resetZoom')
+    this.navigationManager.scale = 1;
+    this.refresh(true);
+  }
+
+  startZoomInAutomation() {
+    this.navigationManager.startZoomInAutomation();
+  }
+
+  stopZoomInAutomation() {
+    this.navigationManager.stopZoomInAutomation();
+  }
+
+  startZoomOutAutomation() {
+    this.navigationManager.startZoomOutAutomation();
+  }
+
+  stopZoomOutAutomation() {
+    this.navigationManager.stopZoomOutAutomation();
+  }
+
+  startPanAutomation() {
+    this.navigationManager.startPanAutomation();
+  }
+
+  stopPanAutomation() {
+    this.navigationManager.stopPanAutomation();
+  }
 }

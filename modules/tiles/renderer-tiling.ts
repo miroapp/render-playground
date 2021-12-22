@@ -1,5 +1,5 @@
 import { RendererBase, RendererProps } from "./renderer-base";
-import { BoundaryBox, contains, intersects, VisualUpdateParams } from "./types";
+import { BoundaryBox, isContains, isIntersects, VisualUpdateParams } from "./types";
 import { Widget } from "./widget";
 
 const TILE_INDICES = [0, 1, 2, 3];
@@ -41,7 +41,7 @@ export class RendererTiling extends RendererBase implements BoundaryBox {
     // Scale unchanged - panning
     if (params.scale === this.scale) {
       // Viewport completely outside of tiles - redraw everything
-      if (!intersects(this, viewport)) {
+      if (!isIntersects(this, viewport)) {
         this.resetTiles(viewport, params.scale);
       } else {
         // Handle shift on X axis
@@ -58,7 +58,7 @@ export class RendererTiling extends RendererBase implements BoundaryBox {
         }
       }
       // Scale changed - zooming. Handle redraw if tiles are too small
-    } else if (!contains(this, viewport) || viewport.width < this.tileWidth / 2) {
+    } else if (!isContains(this, viewport) || viewport.width < this.tileWidth / 2) {
       this.resetTiles(viewport, params.scale);
     }
 
@@ -66,6 +66,7 @@ export class RendererTiling extends RendererBase implements BoundaryBox {
 
     if (this.tiles.map((tile) => tile.needsRender).some((needsRender) => needsRender)) {
       this.renderedWidgets = 0;
+      this.renderedTiles = 0;
       widgets = this.widgetManager.getWidgets(this);
     }
 

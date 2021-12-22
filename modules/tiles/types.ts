@@ -37,7 +37,7 @@ export function isWithin(p: IPoint, b: BoundaryBox) {
   return px > bx0 && px < bx1 && py > by0 && py < by1;
 }
 
-export function intersects(a: BoundaryBox, b: BoundaryBox) {
+export function isIntersects(a: BoundaryBox, b: BoundaryBox) {
   const ax0 = a.x;
   const ay0 = a.y;
   const ax1 = a.x + a.width;
@@ -50,7 +50,7 @@ export function intersects(a: BoundaryBox, b: BoundaryBox) {
   return bx1 > ax0 && bx0 < ax1 && by1 > ay0 && by0 < ay1;
 }
 
-export function contains(a: BoundaryBox, b: BoundaryBox) {
+export function isContains(a: BoundaryBox, b: BoundaryBox) {
   const ax0 = a.x;
   const ay0 = a.y;
   const ax1 = a.x + a.width;
@@ -61,4 +61,17 @@ export function contains(a: BoundaryBox, b: BoundaryBox) {
   const by1 = b.y + b.height;
 
   return bx0 > ax0 && bx1 < ax1 && by0 > ay0 && by1 < ay1;
+}
+
+export function getIntersection(a: BoundaryBox, b: BoundaryBox): BoundaryBox | undefined {
+  if (!isIntersects(a, b)) {
+    return;
+  }
+
+  const x0 = Math.max(a.x, b.x);
+  const y0 = Math.max(a.y, b.y);
+  const x1 = Math.min(a.x + a.width, b.x + b.width);
+  const y1 = Math.min(a.y + a.height, b.y + b.height);
+
+  return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
 }

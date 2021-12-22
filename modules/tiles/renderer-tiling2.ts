@@ -1,193 +1,401 @@
 import { RendererBase, RendererProps } from './renderer-base';
-import { BoundaryBox, contains, intersects, VisualUpdateParams } from './types';
+import {
+  BoundaryBox,
+  IPoint,
+  ISize,
+  VisualUpdateParams,
+  getIntersection
+} from './types';
 import { Widget } from './widget';
+import throttle from 'lodash/throttle';
+import debounce from 'lodash/debounce';
 
-interface TilingRendererProps extends RendererProps {
+type TileKey = string;
+type TileIndex = [number, number];
+type RectTuple = [number, number, number, number];
+
+function composeTileKey(index: TileIndex): TileKey {
+  return `${index[0]},${index[1]}`;
+}
+
+const enum TileState {
+  IDLE,
+  RENDERING,
+  RENDERED,
+  ERROR,
+  EMPTY
+}
+
+class Tile {
+  index: TileIndex;
+  box: BoundaryBox;
+  scale: number;
+  canvas: HTMLCanvasElement;
+  ctx: CanvasRenderingContext2D;
+  state: TileState = TileState.IDLE;
+  needsRender = false;
+
+  constructor(index: TileIndex, box: BoundaryBox, scale: number) {
+    this.index = index;
+    this.box = box;
+    this.scale = scale;
+    this.canvas = document.createElement('canvas');
+    this.canvas.width = box.width;
+    this.canvas.height = box.height;
+    this.ctx = this.canvas.getContext('2d');
+  }
+
+  get key(): string {
+    return composeTileKey(this.index);
+  }
+}
+
+class TileGrid {
+  constructor() {
+
+  }
+
+  static getTileTopLeftPosition(tileIndex: TileIndex, tileSize: ISize): IPoint {
+    return { x: tileIndex[0] * tileSize.width, y: tileIndex[1] * tileSize.height };
+  }
+
+  static getTileBottomRightPosition(tileIndex: TileIndex, tileSize: ISize): IPoint {
+    return {
+      x: (tileIndex[0] + 1) * tileSize.width - 1,
+      y: (tileIndex[1] + 1) * tileSize.height - 1
+    };
+  }
+
+  static getTileBounds(tileIndex: TileIndex, tileSize: ISize): BoundaryBox {
+    return {
+      ...this.getTileTopLeftPosition(tileIndex, tileSize),
+      ...tileSize
+    };
+  }
+
+  static getTileIndexByPosition(point: IPoint, tileSize: ISize): TileIndex {
+    return [Math.floor(point.x / tileSize.width), Math.floor(point.y / tileSize.height)];
+  }
+
+  static getTileIndexesInViewport(viewport: BoundaryBox, tileSize: ISize): [TileIndex, TileIndex] {
+    const topLeftTileIndex = this.getTileIndexByPosition(viewport, tileSize);
+    const bottomRightTileIndex = this.getTileIndexByPosition({
+      x: viewport.x + viewport.width,
+      y: viewport.y + viewport.height
+    }, tileSize);
+
+    return [topLeftTileIndex, bottomRightTileIndex];
+  }
+}
+
+
+// TODO: LRU Cache
+class TileCache {
+  private map = new Map<TileKey, Tile>();
+
+  constructor() {
+
+  }
+
+  add(tile: Tile) {
+    this.map.set(tile.key, tile);
+  }
+
+  get(key: TileKey) {
+    return this.map.get(key);
+  }
+
+  clear() {
+    this.map.clear();
+  }
+}
+
+class TileRenderingQueue {
+
+}
+
+interface TilingRendererProps {
   tileSize?: number;
   showTiles?: boolean;
 }
 
-const TILE_INDICES = [0, 1, 2, 3];
-
-class Tile {
-  canvas: HTMLCanvasElement;
-  ctx: CanvasRenderingContext2D;
-  needsRender = false;
-
-  constructor(width: number, height: number) {
-    this.canvas = document.createElement('canvas');
-    this.canvas.width = width;
-    this.canvas.height = height;
-    this.ctx = this.canvas.getContext('2d');
-  }
-}
-
-export class RendererTiling2 extends RendererBase implements BoundaryBox {
-  x = 0;
-  y = 0;
-  width = 0;
-  height = 0;
+export class RendererTiling2 extends RendererBase {
+  viewport: BoundaryBox;
   scale = 0;
 
-  private tileWidth = 0;
-  private tileHeight = 0;
-  private tiles: Tile[];
+  private tileSize: ISize = { width: 512, height: 512 };
+  private tileCache = new TileCache();
+  private showTiles = false;
 
-  constructor(props: TilingRendererProps) {
+  private zoomRerenderRaf: number;
+
+  constructor(props: RendererProps & TilingRendererProps) {
     super(props);
 
-    this.tiles = TILE_INDICES.map(() => {
-      return new Tile(this.container.width, this.container.height);
-    });
+    this.updateSettings(props, false);
+
+    // const { worldBox } = this.widgetManager;
+    // const worldTopLeft: IPoint = { x: worldBox.x, y: worldBox.y };
+    // const worldBottomRight: IPoint = {
+    //   x: worldBox.x + worldBox.width,
+    //   y: worldBox.y + worldBox.height
+    // };
+    // const worldScale = 1;
+
+    // const tileSize = props.tileSize;
+    // const tileWidth = tileSize;
+    // const tileHeight = tileSize;
+    //
+    // const topTilesCount = Math.ceil(Math.abs(worldTopLeft.y) / tileHeight);
+    // const rightTilesCount = Math.ceil(worldBottomRight.x / tileWidth);
+    // const bottomTilesCount = Math.ceil(worldBottomRight.y / tileHeight);
+    // const leftTilesCount = Math.ceil(Math.abs(worldTopLeft.x) / tileWidth);
+    // const totalTilesCount = topTilesCount + rightTilesCount + bottomTilesCount + bottomTilesCount;
+  }
+
+  updateSettings(props: TilingRendererProps, refresh: boolean = true) {
+    console.log('updateSettings');
+    this.tileSize = { width: props.tileSize, height: props.tileSize };
+    this.showTiles = props.showTiles;
+    this.tileCache.clear();
+
+    if (refresh) {
+      this.refresh(true);
+    }
   }
 
   _render(params: VisualUpdateParams) {
+    const { scale } = params;
     const viewport = this.getVisualUpdateParamsBox(params);
+    const isScaleChanged = scale !== this.scale;
+    const isZoomedOut = scale < this.scale;
 
-    // Scale unchanged - panning
-    if (params.scale === this.scale) {
-      // Viewport completely outside of tiles - redraw everything
-      if (!intersects(this, viewport)) {
-        this.resetTiles(viewport, params.scale);
+    this.doRender(viewport, scale);
+
+    if (isScaleChanged) {
+      if (isZoomedOut) {
+        this.zoomInRerenderDebounced.cancel();
+        this.zoomOutRerenderDebounced();
       } else {
-        // Handle shift on X axis
-        if (viewport.x < this.x) {
-          this.moveTilesLeft();
-        } else if (viewport.x > this.x + this.tileWidth) {
-          this.moveTilesRight();
-        }
-        // Handle shift on Y axis
-        if (viewport.y < this.y) {
-          this.moveTilesUp();
-        } else if (viewport.y > this.y + this.tileHeight) {
-          this.moveTilesDown();
-        }
+        this.zoomOutRerenderDebounced.cancel();
+        this.zoomInRerenderDebounced();
       }
-      // Scale changed - zooming. Handle redraw if tiles are too small
-    } else if (!contains(this, viewport) || viewport.width < this.tileWidth / 2) {
-      this.resetTiles(viewport, params.scale);
+    }
+  }
+
+  reset() {
+    // this.scale = 0;
+  }
+
+
+  private doRender(viewport: BoundaryBox, scale: number, refresh: boolean = false) {
+    const isScaleChanged = scale !== this.scale;
+
+    this.viewport = viewport;
+    this.scale = scale;
+
+    let tiles: Tile[] = [];
+    let needsRender = false;
+
+    // if (scale !== this.scale) {
+    //   this.tileCache.clear();
+    //   needsRender = true;
+    // }
+
+    let tileScale = scale;
+    let scaledTileWidth = this.tileSize.width * tileScale;
+    let scaledTileHeight = this.tileSize.height * tileScale;
+
+    // if (scale < 1) {
+    //   tileScale = 1
+    //   scaledTileWidth = this.tileSize.width;
+    //   scaledTileHeight = this.tileSize.height;
+    // }
+
+    let scaledTileSize = { width: scaledTileWidth, height: scaledTileHeight };
+
+    const scaledViewport = {
+      x: viewport.x * scale,
+      y: viewport.y * scale,
+      width: viewport.width * scale,
+      height: viewport.height * scale
+    };
+
+    const [topLeftIndex, bottomRightIndex] = TileGrid.getTileIndexesInViewport(scaledViewport, scaledTileSize);
+    const tilesTopLeftPosition = TileGrid.getTileTopLeftPosition(topLeftIndex, scaledTileSize);
+    const tilesBottomRightPosition = TileGrid.getTileBottomRightPosition(bottomRightIndex, scaledTileSize);
+    const tileBounds = {
+      ...tilesTopLeftPosition,
+      width: tilesBottomRightPosition.x - tilesTopLeftPosition.x,
+      height: tilesBottomRightPosition.y - tilesTopLeftPosition.y
+    };
+
+    for (let row = topLeftIndex[1]; row <= bottomRightIndex[1]; row++) {
+      for (let col = topLeftIndex[0]; col <= bottomRightIndex[0]; col++) {
+        const tileIndex: TileIndex = [col, row];
+        const tileBounds = TileGrid.getTileBounds(tileIndex, scaledTileSize);
+
+        let tile = this.tileCache.get(composeTileKey(tileIndex));
+
+        if (!tile || refresh) {
+          if (tile) {
+            tile.box = tileBounds;
+            tile.scale = tileScale;
+            tile.needsRender = true;
+          } else {
+            tile = new Tile(tileIndex, tileBounds, tileScale);
+            tile.needsRender = true;
+
+            this.tileCache.add(tile);
+          }
+        } else {
+          if (!isScaleChanged && tile.scale !== tileScale) {
+            tile.box = tileBounds;
+            tile.scale = tileScale;
+            tile.needsRender = true;
+          }
+        }
+
+        tiles.push(tile);
+        needsRender ||= tile.needsRender;
+      }
     }
 
     let widgets;
 
-    if (this.tiles.map((tile) => tile.needsRender).some((needsRender) => needsRender)) {
+    if (needsRender) {
+      this.renderedTiles = 0;
       this.renderedWidgets = 0;
-      widgets = this.widgetManager.getWidgets(this);
+      // TODO: Can be optimized by creating tileBounds only for tiles that needsRender
+      widgets = this.widgetManager.getWidgets(tileBounds, scale);
     }
 
-    this.renderTiles(widgets);
-    this.renderViewport(viewport, params.scale);
+    this.renderTiles(tiles, widgets);
+    this.renderViewport(tiles, scaledViewport);
   }
 
-  reset() {
-    this.x = 0;
-    this.y = 0;
-    this.width = 0;
-    this.height = 0;
-    this.scale = 0;
-    this.tileWidth = 0;
-    this.tileHeight = 0;
+  private zoomInRerenderDebounced = debounce(() => {
+    console.log('zoomInRerenderDebounced');
+    cancelAnimationFrame(this.zoomRerenderRaf);
+    this.zoomRerenderRaf = requestAnimationFrame(() => {
+      this.doRender(this.viewport, this.scale, true);
+    });
+  }, 500, { leading: false, trailing: true, maxWait: 3000 });
+
+  private zoomOutRerenderDebounced = debounce(() => {
+    console.log('zoomOutRerenderDebounced');
+    cancelAnimationFrame(this.zoomRerenderRaf);
+    this.zoomRerenderRaf = requestAnimationFrame(() => {
+      this.doRender(this.viewport, this.scale, true);
+    });
+  }, 500, { leading: false, trailing: true });
+
+  private renderTiles(tiles: Tile[], widgets?: Widget[]): void {
+    for (let i = 0; i < tiles.length; i++) {
+      this.renderTile(tiles[i], widgets);
+    }
   }
 
-  private renderTile(index: number, widgets?: Widget[]): void {
-    const tile = this.tiles[index];
-
-    if (!tile.needsRender) {
+  private renderTile(tile: Tile, widgets?: Widget[]): void {
+    if (!tile.needsRender || !widgets.length) {
       return;
     }
 
-    const tileBox = {
-      x: index % 2 === 0 ? this.x : this.x + this.tileWidth,
-      y: index < 2 ? this.y : this.y + this.tileHeight,
-      width: this.tileWidth,
-      height: this.tileHeight
-    };
+    widgets = this.widgetManager.getWidgets(tile.box, this.scale, widgets);
 
-    this.drawContext(tile.ctx, tileBox, this.scale, widgets);
+    this.drawContext2(tile.ctx, tile.box, this.scale, widgets);
+
     tile.needsRender = false;
   }
 
-  private renderTiles(widgets?: Widget[]): void {
-    TILE_INDICES.forEach((index) => this.renderTile(index, widgets));
+  protected drawContext2(
+    context: CanvasRenderingContext2D,
+    box: BoundaryBox,
+    scale: number,
+    fromWidgets?: Widget[]
+  ): void {
+    const widgets = this.widgetManager.getWidgets(box, scale, fromWidgets);
+
+    if (context.canvas.width !== box.width || context.canvas.height !== box.height) {
+      context.canvas.width = box.width;
+      context.canvas.height = box.height;
+    } else {
+      context.clearRect(0, 0, box.width, box.height);
+    }
+
+    for (let i = 0; i < widgets.length; i++) {
+      const widget = widgets[i];
+
+      context.drawImage(
+        widget.image,
+        widget.box.x * scale - box.x,
+        widget.box.y * scale - box.y,
+        widget.box.width * scale,
+        widget.box.height * scale
+      );
+    }
+
+    this.renderedWidgets += widgets.length;
+    this.renderedTiles += 1;
+    this.renderCount += 1;
   }
 
-  private renderViewport(viewport: BoundaryBox, scale: number) {
-    const viewportScaledWidth = viewport.width * this.scale;
-    const viewportScaledHeight = viewport.height * this.scale;
-
-    const x0 = (viewport.x - this.x) * this.scale;
-    const x1 = Math.min(viewportScaledWidth, this.container.width - x0);
-    const x2 = viewportScaledWidth - x1;
-    const y0 = (viewport.y - this.y) * this.scale;
-    const y1 = Math.min(viewportScaledHeight, this.container.height - y0);
-    const y2 = viewportScaledHeight - y1;
-
-    const scaleRatio = scale / this.scale;
-
-    const w0 = x1 * scaleRatio;
-    const w1 = x2 * scaleRatio;
-    const h0 = y1 * scaleRatio;
-    const h1 = y2 * scaleRatio;
-
+  private renderViewport(tiles: Tile[], scaledViewport: BoundaryBox) {
     this.context.clearRect(0, 0, this.container.width, this.container.height);
 
-    this.context.drawImage(this.tiles[0].canvas, x0, y0, x1, y1, 0, 0, w0, h0);
-    this.context.drawImage(this.tiles[1].canvas, 0, y0, x2, y1, w0, 0, w1, h0);
-    this.context.drawImage(this.tiles[2].canvas, x0, 0, x1, y2, 0, h0, w0, h1);
-    this.context.drawImage(this.tiles[3].canvas, 0, 0, x2, y2, w0, h0, w1, h1);
+    for (let i = 0; i < tiles.length; i++) {
+      const tile = tiles[i];
+      let scaledBox = tile.box;
 
-    this.context.strokeStyle = '#ff0000';
+      if (tile.scale !== this.scale) {
+        scaledBox = {
+          x: scaledBox.x / tile.scale * this.scale,
+          y: scaledBox.y / tile.scale * this.scale,
+          width: scaledBox.width / tile.scale * this.scale,
+          height: scaledBox.height / tile.scale * this.scale
+        };
+      }
 
-    this.context.strokeRect(0, 0, w0, h0);
-    this.context.strokeRect(w0, 0, w1, h0);
-    this.context.strokeRect(0, h0, w0, h1);
-    this.context.strokeRect(w0, h0, w1, h1);
-  }
+      const intersection = getIntersection(scaledBox, scaledViewport);
 
-  private invalidateTiles(...indices: number[]): void {
-    indices.forEach((index) => (this.tiles[index].needsRender = true));
-  }
+      if (!intersection) {
+        console.log('WTF? No intersection', { tile, scaledBox, scaledViewport });
+        continue;
+      }
 
-  private swapTilesX(): void {
-    this.tiles = [this.tiles[1], this.tiles[0], this.tiles[3], this.tiles[2]];
-  }
+      let intersection2 = intersection;
 
-  private swapTilesY(): void {
-    this.tiles = [this.tiles[2], this.tiles[3], this.tiles[0], this.tiles[1]];
-  }
+      if (tile.scale !== this.scale) {
+        intersection2 = {
+          x: intersection2.x * tile.scale / this.scale,
+          y: intersection2.y * tile.scale / this.scale,
+          width: intersection2.width * tile.scale / this.scale,
+          height: intersection2.height * tile.scale / this.scale
+        };
+      }
 
-  private moveTilesLeft(): void {
-    this.swapTilesX();
-    this.invalidateTiles(0, 2);
-    this.x -= this.tileWidth;
-  }
+      const src: RectTuple = [
+        intersection2.x - tile.box.x,
+        intersection2.y - tile.box.y,
+        intersection2.width,
+        intersection2.height
+      ];
 
-  private moveTilesRight(): void {
-    this.swapTilesX();
-    this.invalidateTiles(1, 3);
-    this.x += this.tileWidth;
-  }
+      const dst: RectTuple = [
+        intersection.x - scaledViewport.x,
+        intersection.y - scaledViewport.y,
+        Math.min(scaledBox.width, intersection.width),
+        Math.min(scaledBox.height, intersection.height)
+      ];
 
-  private moveTilesUp(): void {
-    this.swapTilesY();
-    this.invalidateTiles(0, 1);
-    this.y -= this.tileHeight;
-  }
+      this.context.drawImage(tiles[i].canvas, ...src, ...dst);
 
-  private moveTilesDown(): void {
-    this.swapTilesY();
-    this.invalidateTiles(2, 3);
-    this.y += this.tileHeight;
-  }
+      if (this.showTiles) {
+        this.context.strokeStyle = '#ff0000';
+        this.context.lineWidth = devicePixelRatio - 0.5;
 
-  private resetTiles(viewport: BoundaryBox, scale: number): void {
-    this.invalidateTiles(0, 1, 2, 3);
-    this.x = viewport.x - viewport.width / 2;
-    this.y = viewport.y - viewport.height / 2;
-    this.width = viewport.width * 2;
-    this.height = viewport.height * 2;
-    this.scale = scale;
-    this.tileWidth = viewport.width;
-    this.tileHeight = viewport.height;
+        this.context.strokeRect(...dst);
+      }
+    }
   }
 }
