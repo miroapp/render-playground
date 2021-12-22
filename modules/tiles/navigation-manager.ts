@@ -45,14 +45,16 @@ export class NavigationManager {
   zoomBy(delta: number, cursor?: IPoint): this {
     const newScale = Math.min(Math.max(this.scale * (1 + delta * 0.01), 0.04), 4);
     if (newScale !== this.scale) {
-      this.scale = Math.min(Math.max(this.scale * (1 + delta * 0.01), 0.04), 4);
-      clearTimeout(this._endZoomTimeout);
-      this._endZoomTimeout = setTimeout(() => {
-        this.renderer.reset();
-        this.renderer.render({ canvasOffset: this.position, scale: this.scale });
-        this._isZooming = false;
-      }, 100);
-      this._isZooming = true;
+      this.scale = newScale;
+      // clearTimeout(this._endZoomTimeout);
+      // this._endZoomTimeout = setTimeout(() => {
+      //   this.renderer.reset();
+      //   this.renderer.render({ canvasOffset: this.position, scale: this.scale });
+      //   this._isZooming = false;
+      // }, 100);
+      // this._isZooming = true;
+
+      this.renderer.render({ canvasOffset: this.position, scale: this.scale });
     }
     return this;
   }

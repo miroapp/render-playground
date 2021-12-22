@@ -48,6 +48,15 @@ class Tile {
   get key(): string {
     return composeTileKey(this.index);
   }
+
+  get scaledBox(): BoundaryBox {
+    return {
+      x: this.box.x * this.scale,
+      y: this.box.y * this.scale,
+      width: this.box.width * this.scale,
+      height: this.box.height * this.scale
+    }
+  }
 }
 
 class TileGrid {
@@ -206,7 +215,7 @@ export class RendererTiling2 extends RendererBase {
     let scaledTileWidth = this.tileSize.width * tileScale;
     let scaledTileHeight = this.tileSize.height * tileScale;
 
-    // if (scale < 1) {
+    // if (refresh && scale < 1) {
     //   tileScale = 1
     //   scaledTileWidth = this.tileSize.width;
     //   scaledTileHeight = this.tileSize.height;
@@ -233,13 +242,12 @@ export class RendererTiling2 extends RendererBase {
     for (let row = topLeftIndex[1]; row <= bottomRightIndex[1]; row++) {
       for (let col = topLeftIndex[0]; col <= bottomRightIndex[0]; col++) {
         const tileIndex: TileIndex = [col, row];
-        const tileBounds = TileGrid.getTileBounds(tileIndex, scaledTileSize);
+        const tileBounds = TileGrid.getTileBounds(tileIndex, this.tileSize);
 
         let tile = this.tileCache.get(composeTileKey(tileIndex));
 
         if (!tile || refresh) {
           if (tile) {
-            tile.box = tileBounds;
             tile.scale = tileScale;
             tile.needsRender = true;
           } else {
@@ -250,7 +258,6 @@ export class RendererTiling2 extends RendererBase {
           }
         } else {
           if (!isScaleChanged && tile.scale !== tileScale) {
-            tile.box = tileBounds;
             tile.scale = tileScale;
             tile.needsRender = true;
           }
@@ -280,7 +287,7 @@ export class RendererTiling2 extends RendererBase {
     this.zoomRerenderRaf = requestAnimationFrame(() => {
       this.doRender(this.viewport, this.scale, true);
     });
-  }, 500, { leading: false, trailing: true, maxWait: 3000 });
+  }, 200, { leading: false, trailing: true, maxWait: 2000 });
 
   private zoomOutRerenderDebounced = debounce(() => {
     console.log('zoomOutRerenderDebounced');
@@ -288,7 +295,7 @@ export class RendererTiling2 extends RendererBase {
     this.zoomRerenderRaf = requestAnimationFrame(() => {
       this.doRender(this.viewport, this.scale, true);
     });
-  }, 500, { leading: false, trailing: true });
+  }, 200, { leading: false, trailing: true });
 
   private renderTiles(tiles: Tile[], widgets?: Widget[]): void {
     for (let i = 0; i < tiles.length; i++) {
@@ -301,9 +308,9 @@ export class RendererTiling2 extends RendererBase {
       return;
     }
 
-    widgets = this.widgetManager.getWidgets(tile.box, this.scale, widgets);
+    widgets = this.widgetManager.getWidgets(tile.scaledBox, this.scale, widgets);
 
-    this.drawContext2(tile.ctx, tile.box, this.scale, widgets);
+    this.drawContext2(tile.ctx, tile.scaledBox, this.scale, widgets);
 
     tile.needsRender = false;
   }
@@ -345,14 +352,16 @@ export class RendererTiling2 extends RendererBase {
 
     for (let i = 0; i < tiles.length; i++) {
       const tile = tiles[i];
-      let scaledBox = tile.box;
+
+      let tileBox = tile.box
+      let scaledBox = tile.scaledBox;
 
       if (tile.scale !== this.scale) {
         scaledBox = {
-          x: scaledBox.x / tile.scale * this.scale,
-          y: scaledBox.y / tile.scale * this.scale,
-          width: scaledBox.width / tile.scale * this.scale,
-          height: scaledBox.height / tile.scale * this.scale
+          x: tileBox.x * this.scale,
+          y: tileBox.y * this.scale,
+          width: tileBox.width * this.scale,
+          height: tileBox.height * this.scale
         };
       }
 
@@ -375,8 +384,8 @@ export class RendererTiling2 extends RendererBase {
       }
 
       const src: RectTuple = [
-        intersection2.x - tile.box.x,
-        intersection2.y - tile.box.y,
+        intersection2.x - tile.scaledBox.x,
+        intersection2.y - tile.scaledBox.y,
         intersection2.width,
         intersection2.height
       ];
