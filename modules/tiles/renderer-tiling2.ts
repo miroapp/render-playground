@@ -43,6 +43,8 @@ class Tile {
     this.canvas.width = box.width;
     this.canvas.height = box.height;
     this.ctx = this.canvas.getContext('2d');
+    this.ctx.imageSmoothingEnabled = true;
+    this.ctx.imageSmoothingQuality = "high";
   }
 
   get key(): string {
@@ -97,6 +99,7 @@ class TileGrid {
   }
 }
 
+// TODO: Use objects pool
 
 // TODO: LRU Cache
 class TileCache {
@@ -140,6 +143,9 @@ export class RendererTiling2 extends RendererBase {
 
   constructor(props: RendererProps & TilingRendererProps) {
     super(props);
+
+    this.context.imageSmoothingEnabled = true;
+    this.context.imageSmoothingQuality = "high";
 
     this.updateSettings(props, false);
 
@@ -287,7 +293,9 @@ export class RendererTiling2 extends RendererBase {
     this.zoomRerenderRaf = requestAnimationFrame(() => {
       this.doRender(this.viewport, this.scale, true);
     });
-  }, 200, { leading: false, trailing: true, maxWait: 2000 });
+    // TODO: Update maxWait based on zoom level
+    // (for example for lower zoom levels there is no sense to re-render, but for higher it makes sense)
+  }, 100, { leading: false, trailing: true, maxWait: 3000 });
 
   private zoomOutRerenderDebounced = debounce(() => {
     console.log('zoomOutRerenderDebounced');
@@ -295,7 +303,7 @@ export class RendererTiling2 extends RendererBase {
     this.zoomRerenderRaf = requestAnimationFrame(() => {
       this.doRender(this.viewport, this.scale, true);
     });
-  }, 200, { leading: false, trailing: true });
+  }, 100, { leading: false, trailing: true });
 
   private renderTiles(tiles: Tile[], widgets?: Widget[]): void {
     for (let i = 0; i < tiles.length; i++) {
