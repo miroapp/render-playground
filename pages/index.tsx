@@ -19,6 +19,15 @@ const Home: NextPage = () => {
         </p>
 
         <div className={styles.grid}>
+          <Link href="/hsp" passHref>
+            <a className={styles.card}>
+              <h2>Spatial Hash API &rarr;</h2>
+              <p>Experiment with Spatial Hash API.</p>
+            </a>
+          </Link>
+        </div>
+
+        <div className={styles.grid}>
           <Link href="/tiles" passHref>
             <a className={styles.card}>
               <h2>Tiles API &rarr;</h2>
